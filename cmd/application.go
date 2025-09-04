@@ -2,28 +2,62 @@ package main
 
 import (
 	"net/http"
+	"time"
 
-	"github.com/LincolnG4/iot-hydra/cmd/api"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
+
+	"github.com/LincolnG4/iot-hydra/internal/runtimer"
 	"github.com/gin-gonic/gin"
+	"github.com/rs/zerolog"
 )
 
 type application struct {
-	PodmanRuntime *api.PodmanHandler
+	PodmanRuntime *runtimer.PodmanManager
+	logger        *zerolog.Logger
+	config        *config
 }
 
-func (a *application) mount() http.Handler {
+type config struct {
+	Addr string
+}
+
+func (a *application) mount() *gin.Engine {
 	router := gin.Default()
-
 	gin.DisableConsoleColor()
-
+	// Add the otelgin middleware
+	router.Use(otelgin.Middleware("iot-hydra-runtime"))
 	{
 		v1 := router.Group("/v1")
 		{
-			event := v1.Group("/containers")
-			event.GET("/", a.PodmanRuntime.ListAll)
+			containers := v1.Group("/containers")
+			containers.POST("/", a.createContainer)
+			containers.GET("/", a.listContainer)
+
+			containers.GET("/:name", a.checkContainer)
+			containers.POST("/:name/start", a.startContainer)
+			containers.POST("/:name/stop", a.stopContainer)
+			containers.DELETE("/:name", a.deleteContainer)
+
+			// health endpoint
+			health := v1.Group("/health")
+			health.GET("/", a.healthChecker)
 		}
 
 	}
 
 	return router
+}
+
+func (a *application) run(r *gin.Engine) error {
+	srv := &http.Server{
+		Addr:         ":8080",
+		Handler:      r,
+		WriteTimeout: 30 * time.Second,
+		ReadTimeout:  10 * time.Second,
+		IdleTimeout:  time.Minute,
+	}
+
+	a.logger.Info().Msg("server has started at localhost:8080")
+
+	return srv.ListenAndServe()
 }

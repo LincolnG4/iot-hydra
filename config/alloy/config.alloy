@@ -1,0 +1,86 @@
+// 1. Discover all Docker containers running on the host.
+discovery.docker "docker_discovery" {
+  host = "unix:///var/run/docker.sock"
+}
+
+// 2. Filter the discovered containers to keep only "iot-runtime".
+discovery.relabel "filtered_containers" {
+  targets = discovery.docker.docker_discovery.targets
+
+  // Rule to keep only the container named "iot-runtime".
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/iot-runtime" // The name of your service container
+    action        = "keep"
+  }
+
+  // Rule to create a clean "container" label from the container's name.
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+  }
+}
+
+// 3. Scrape logs from the filtered container(s).
+loki.source.docker "logs" {
+  host    = "unix:///var/run/docker.sock"
+  targets = discovery.relabel.filtered_containers.output
+  forward_to = [loki.write.loki.receiver]
+}
+
+// 4. Send the collected logs to the Loki service.
+loki.write "loki" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}
+
+otelcol.receiver.otlp "default" {
+  grpc {
+    endpoint = "0.0.0.0:4317"
+  }
+  http {
+    endpoint = "0.0.0.0:4318"
+  }
+
+  // The output of this receiver will be sent to the processors.
+  output {
+    metrics = [otelcol.processor.batch.default.input]
+    traces  = [otelcol.processor.batch.default.input]
+  }
+}
+
+// 3.2. PROCESSOR: Batch data for efficiency.
+otelcol.processor.batch "default" {
+  // The output of this processor will be sent to the exporters.
+  output {
+    metrics = [otelcol.exporter.prometheus.default.input]
+    traces  = [otelcol.exporter.otlp.tempo.input]
+  }
+}
+
+// 3.3. EXPORTERS: Send data to backends.
+
+// Exporter for sending traces to Tempo.
+otelcol.exporter.otlp "tempo" {
+  client {
+    endpoint = "tempo:4317"
+    tls {
+      insecure = true
+    }
+  }
+}
+
+// Exporter for exposing metrics to be scraped by Prometheus.
+// This component makes metrics available on Alloy's own /metrics endpoint.
+otelcol.exporter.prometheus "default" {
+  forward_to = [prometheus.remote_write.local.receiver]
+}
+
+// This component is needed to connect the otelcol pipeline to prometheus scraping
+prometheus.remote_write "local" {
+  endpoint {
+    url = "http://prometheus:9090/api/v1/write"
+  }
+}

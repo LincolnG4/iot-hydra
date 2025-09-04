@@ -8,11 +8,115 @@ services:
       - "8222:8222"
     volumes:
       - ./nats.conf:/etc/nats/nats.conf
-  nats-client:
-    image: natsio/nats-box
-    container_name: nats_client
-    restart: always
+    networks:
+      - iot-net
+  alloy:
+    container_name: alloy
+    image: grafana/alloy:latest
+    pull_policy: always
+    restart: on-failure
+    volumes:
+      - type: bind
+        source: ./config/alloy/config.alloy
+        target: /etc/alloy/config.alloy
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - type: bind
+        source: /var/log
+        target: /var/log
+      - type: bind
+        source: /proc
+        target: /host/proc
+        read_only: true
+      - type: bind
+        source: /
+        target: /host/rootfs
+        read_only: true
+      - type: bind
+        source: /sys
+        target: /host/sys
+        read_only: true
+    environment:
+      LOKI_HOST: loki:3100
     depends_on:
-      - nats
-    entrypoint: /bin/sh
-    tty: true
+      - loki
+      - tempo
+    command:
+      - run
+      - /etc/alloy/config.alloy
+      - --server.http.listen-addr=0.0.0.0:12345
+    ports:
+      - '12345:12345'
+    networks:
+      - iot-net
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - gf_security_admin_password=admin
+    volumes:
+      - grafana-storage:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    networks:
+      - iot-net
+
+  loki:
+    container_name: loki
+    image: grafana/loki:latest
+    restart: on-failure
+    ports:
+      - '3100:3100'
+    networks:
+      - iot-net
+
+  tempo:
+    container_name: tempo 
+    image: grafana/tempo:latest
+    restart: on-failure
+    command: [ "-config.file=/etc/tempo.yaml" ]
+    volumes:
+      - ./config/tempo/tempo.yaml:/etc/tempo.yaml
+    ports:
+      - '3200:3200'
+      - '4317:4317'
+    networks:
+      - iot-net
+  iot-runtime:
+    container_name: iot-runtime
+    env_file: ".envrc"
+    build:
+      context: .
+      dockerfile: ./Dockerfile 
+    privileged: true
+    networks:
+      - iot-net
+    ports:
+      - "8080:8080"
+    volumes:
+      - .:/app
+      - /run/user/1000/podman/podman.sock:/run/user/1000/podman/podman.sock:ro
+    environment: 
+    - PODMAN_SOCKET_PATH=/run/user/1000/podman/podman.sock
+
+
+volumes:
+  grafana-storage:
+  tempo-storage:
+
+networks:
+  iot-net:
