@@ -11,6 +11,15 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+type PodmanRuntime interface {
+	CreateContainer(container Container) error
+	CheckContainer(name string) (Container, error)
+	StartContainer(name string) error
+	StopContainer(name string) error
+	DeleteContainer(name string) error
+	ListContainers() ([]Container, error)
+}
+
 type PodmanConnector struct {
 	ctx        context.Context
 	socketPath string

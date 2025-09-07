@@ -12,7 +12,7 @@ import (
 )
 
 type application struct {
-	PodmanRuntime *runtimer.PodmanManager
+	PodmanRuntime runtimer.PodmanRuntime
 	logger        *zerolog.Logger
 	config        *config
 }

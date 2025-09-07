@@ -32,8 +32,6 @@ func main() {
 	// }()
 	// otel.SetTracerProvider(sdktrace.NewTracerProvider(sdktrace.WithSampler(sdktrace.ParentBased(sdktrace.AlwaysSample()))))
 
-	sock := os.Getenv("podman_socket_path")
-	log.Info().Msg(sock)
 	log.Debug().Msg("starting PodmanRuntime")
 	podmanRuntime, err := runtimer.NewPodmanManager(
 		&runtimer.ManagerOptions{
