@@ -16,7 +16,7 @@ func main() {
 	// OpenTelemetry setup
 	log.Debug().Msg("starting OpenTelemetry")
 	// Handle SIGINT (CTRL+C) gracefully.
-	// ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	// ctx, stop := signal.NotifyCo2ntext(context.Background(), os.Interrupt)
 	// defer stop()
 
 	// // Set up OpenTelemetry.
@@ -49,6 +49,8 @@ func main() {
 		config: &config{
 			Addr: ":8080",
 		},
+		// TODO add config number of messages in the queue
+		MessageQueue: make(chan IoTMessage, 10000),
 	}
 
 	mux := app.mount()

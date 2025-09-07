@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -15,6 +16,9 @@ type application struct {
 	PodmanRuntime runtimer.PodmanRuntime
 	logger        *zerolog.Logger
 	config        *config
+	MessageQueue  chan IoTMessage
+	ctx           context.Context
+	cancel        context.CancelFunc
 }
 
 type config struct {
@@ -41,11 +45,29 @@ func (a *application) mount() *gin.Engine {
 			// health endpoint
 			health := v1.Group("/health")
 			health.GET("/", a.healthChecker)
+
+			// websocket message driven
+			iotAgent := v1.Group("/ws")
+			iotAgent.GET("/", a.websocketIoTHandler)
 		}
 
 	}
 
 	return router
+}
+
+func (a *application) startMessageAgent(r *gin.Engine) {
+	iotAgent := NewIoTAgent()
+	go func() {
+		for {
+			select {
+			case msg := <-a.MessageQueue:
+
+			case <-a.ctx.Done():
+				a.logger.Info().Msg("iot message agent stopped")
+			}
+		}
+	}()
 }
 
 func (a *application) run(r *gin.Engine) error {
