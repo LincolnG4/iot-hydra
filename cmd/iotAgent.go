@@ -6,10 +6,17 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	"github.com/nats-io/nats.go"
 )
 
 type IoTAgent struct {
-	config ServiceConfig
+	config *ServiceConfig
+}
+
+func NewIoTAgent(cfg *ServiceConfig) IoTAgent {
+	return IoTAgent{
+		config: cfg,
+	}
 }
 
 type ServiceConfig struct {
@@ -19,7 +26,16 @@ type ServiceConfig struct {
 	Custom CustomConfig `json:"custom"`
 }
 
-type NATSConfig struct{}
+type NATSConfig struct {
+	URL       string `json:"url"`
+	Topic     string
+	BasicAuth *BasicAuth
+}
+
+type BasicAuth struct {
+	Username string
+	Password string
+}
 
 type AzureConfig struct {
 	ConnectionString string `json:"connection_string"`
@@ -56,6 +72,24 @@ var wsupgrader = websocket.Upgrader{
 	WriteBufferSize: 1024,
 }
 
+func (ag *IoTAgent) Route(msg *IoTMessage) error {
+	target := msg.Target[0]
+	switch target {
+	case "nats":
+		return ag.Send(msg)
+	default:
+		return fmt.Errorf("target %s is not allowed", target)
+	}
+}
+
+func (ag *IoTAgent) Send(msg *IoTMessage) error {
+	nc, err := nats.Connect(msg.Target[0])
+	if err != nil {
+		return err
+	}
+	return nc.Publish("my.iot", []byte("meu bilau"))
+}
+
 func (a *application) websocketIoTHandler(c *gin.Context) {
 	conn, err := wsupgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
@@ -68,15 +102,12 @@ func (a *application) websocketIoTHandler(c *gin.Context) {
 		msg := IoTMessage{}
 		err := conn.ReadJSON(&msg)
 		if err != nil {
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				a.logger.Error().Err(fmt.Errorf("WebSocket error: %v", err)).Msg("")
-			}
+			a.logger.Error().Err(fmt.Errorf("WebSocket error: %v", err)).Msg("")
 			break
 		}
 
 		msg.ID = fmt.Sprintf("ws-%d", time.Now().UnixNano())
 		msg.Timestamp = time.Now()
-
 		select {
 		case a.MessageQueue <- msg:
 			a.logger.Debug().Msg("Message received via WebSocket:" + msg.ID)

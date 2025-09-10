@@ -43,8 +43,19 @@ func main() {
 		return
 	}
 
+	iotagent := NewIoTAgent(&ServiceConfig{
+		Nats: NATSConfig{
+			URL: "localhost:4222",
+			BasicAuth: &BasicAuth{
+				Username: "test",
+				Password: "test",
+			},
+		},
+	})
+
 	app := application{
 		PodmanRuntime: &podmanRuntime,
+		IoTAgent:      &iotagent,
 		logger:        &logger,
 		config: &config{
 			Addr: ":8080",
