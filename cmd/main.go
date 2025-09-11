@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 
+	"github.com/LincolnG4/iot-hydra/internal/message"
 	"github.com/LincolnG4/iot-hydra/internal/runtimer"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -43,25 +44,16 @@ func main() {
 		return
 	}
 
-	iotagent := NewIoTAgent(&ServiceConfig{
-		Nats: NATSConfig{
-			URL: "localhost:4222",
-			BasicAuth: &BasicAuth{
-				Username: "test",
-				Password: "test",
-			},
-		},
-	})
-
 	app := application{
 		PodmanRuntime: &podmanRuntime,
-		IoTAgent:      &iotagent,
-		logger:        &logger,
+		// IoTAgent:      &iotagent,
+		logger: &logger,
 		config: &config{
 			Addr: ":8080",
 		},
-		// TODO add config number of messages in the queue
-		MessageQueue: make(chan IoTMessage, 10000),
+
+		// TODO: add config number of messages in the queue
+		MessageQueue: make(chan message.Message, 10000),
 	}
 
 	mux := app.mount()
