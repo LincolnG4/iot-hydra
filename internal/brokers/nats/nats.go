@@ -61,3 +61,7 @@ func (n *NATS) Stop() error {
 func (n *NATS) Publish(msg message.Message) error {
 	return n.conn.Publish(msg.Topic, []byte("Test"))
 }
+
+func (n *NATS) SubscribeSync(topic string) (*nats.Subscription, error) {
+	return n.conn.SubscribeSync(topic)
+}

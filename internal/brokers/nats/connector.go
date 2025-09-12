@@ -1,6 +1,10 @@
 package nats
 
+import "github.com/nats-io/nats.go"
+
 type Connector interface {
-	Publish(subj string, data []byte) error
+	Publish(string, []byte) error
+	SubscribeSync(string) (*nats.Subscription, error)
+
 	Close()
 }
