@@ -7,7 +7,7 @@ import (
 )
 
 type NATS struct {
-	conn        *nats.Conn
+	conn        Connector
 	isConnected bool
 	config      Config
 }
@@ -41,12 +41,12 @@ func (n *NATS) Connect() error {
 		ncOpts = append(ncOpts, nats.UserInfo(opts.Username, opts.Password))
 	}
 
-	conn, err := nats.Connect(n.config.URL, ncOpts...)
+	var err error
+	n.conn, err = nats.Connect(n.config.URL, ncOpts...)
 	if err != nil {
 		return err
 	}
 
-	n.conn = conn
 	n.isConnected = true
 	return nil
 }
@@ -59,5 +59,5 @@ func (n *NATS) Stop() error {
 }
 
 func (n *NATS) Publish(msg message.Message) error {
-	return nil
+	return n.conn.Publish(msg.Topic, []byte("Test"))
 }

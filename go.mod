@@ -3,6 +3,7 @@ module github.com/LincolnG4/iot-hydra
 go 1.24.5
 
 require (
+	github.com/alecthomas/assert v1.0.0
 	github.com/containers/podman/v5 v5.5.2
 	github.com/gin-gonic/gin v1.10.1
 	github.com/gorilla/websocket v1.5.3
@@ -28,6 +29,8 @@ require (
 	github.com/Microsoft/hcsshim v0.13.0 // indirect
 	github.com/VividCortex/ewma v1.2.0 // indirect
 	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d // indirect
+	github.com/alecthomas/colour v0.1.0 // indirect
+	github.com/alecthomas/repr v0.0.0-20210801044451-80ca428c5142 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/bytedance/sonic v1.14.0 // indirect
@@ -55,7 +58,7 @@ require (
 	github.com/disiqueira/gotree/v3 v3.0.2 // indirect
 	github.com/distribution/reference v0.6.0 // indirect
 	github.com/docker/distribution v2.8.3+incompatible // indirect
-	github.com/docker/docker v28.1.1+incompatible // indirect
+	github.com/docker/docker v28.2.2+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.9.3 // indirect
 	github.com/docker/go-connections v0.5.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
@@ -139,6 +142,7 @@ require (
 	github.com/prometheus/client_golang v1.22.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/secure-systems-lab/go-securesystemslib v0.9.0 // indirect
+	github.com/sergi/go-diff v1.3.1 // indirect
 	github.com/sigstore/fulcio v1.6.6 // indirect
 	github.com/sigstore/protobuf-specs v0.4.1 // indirect
 	github.com/sigstore/rekor v1.3.10 // indirect
