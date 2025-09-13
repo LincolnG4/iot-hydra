@@ -1,9 +1,15 @@
 package nats
 
 import (
+	"time"
+
 	"github.com/LincolnG4/iot-hydra/internal/auth"
 	"github.com/LincolnG4/iot-hydra/internal/message"
 	"github.com/nats-io/nats.go"
+)
+
+const (
+	NATSType = "nats"
 )
 
 type NATS struct {
@@ -22,6 +28,10 @@ func NewBroker(cfg Config) *NATS {
 type Config struct {
 	URL  string             `json:"url"`
 	Auth auth.Authenticator `json:"auth"`
+}
+
+func (n *NATS) Type() string {
+	return NATSType
 }
 
 func (n *NATS) Connect() error {
@@ -58,10 +68,25 @@ func (n *NATS) Stop() error {
 	return nil
 }
 
-func (n *NATS) Publish(msg message.Message) error {
-	return n.conn.Publish(msg.Topic, []byte("Test"))
+func (n *NATS) Publish(msg *message.Message) error {
+	return n.conn.Publish(msg.Topic, msg.Payload)
 }
 
-func (n *NATS) SubscribeSync(topic string) (*nats.Subscription, error) {
-	return n.conn.SubscribeSync(topic)
+func (n *NATS) SubscribeAndWait(topic string, waitSecond time.Duration) (*message.Message, error) {
+	s, err := n.conn.SubscribeSync(topic)
+	if err != nil {
+		return nil, err
+	}
+	defer s.Unsubscribe()
+
+	msg, err := s.NextMsg(waitSecond)
+	if err != nil {
+		return nil, err
+	}
+
+	return &message.Message{
+		Payload: msg.Data,
+		Topic:   topic,
+		Type:    NATSType,
+	}, nil
 }
