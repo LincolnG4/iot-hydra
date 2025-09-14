@@ -26,8 +26,13 @@ func NewBroker(cfg Config) *NATS {
 }
 
 type Config struct {
-	URL  string             `json:"url"`
-	Auth auth.Authenticator `json:"auth"`
+	Name string             `json:"name" yaml:"name"`
+	URL  string             `json:"url" yaml:"url"`
+	Auth auth.Authenticator `json:"auth" yaml:"auth"`
+}
+
+func (n *NATS) Name() string {
+	return n.config.Name
 }
 
 func (n *NATS) Type() string {

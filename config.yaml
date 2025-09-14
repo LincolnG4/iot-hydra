@@ -1,0 +1,11 @@
+telemetryAgent:
+  queueSize: 1000
+  brokers:
+    - name: ligmaMyNats
+      type: nats
+      address: "localhost:4222"
+      auth:
+        method: plain 
+        user: test
+        password: test
+

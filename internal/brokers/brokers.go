@@ -7,9 +7,12 @@ import (
 	"github.com/LincolnG4/iot-hydra/internal/auth"
 	"github.com/LincolnG4/iot-hydra/internal/brokers/nats"
 	"github.com/LincolnG4/iot-hydra/internal/message"
+	"gopkg.in/yaml.v3"
 )
 
 type Broker interface {
+	// Unique name
+	Name() string
 	// Broker type
 	Type() string
 
@@ -28,9 +31,56 @@ type Broker interface {
 }
 
 type Config struct {
-	Type    string
-	Address string
-	Auth    auth.Authenticator
+	Name    string             `yaml:"name"`
+	Type    string             `yaml:"type"`
+	Address string             `yaml:"address"`
+	Auth    auth.Authenticator `yaml:"auth"`
+}
+
+// Custom unmarshaling for Config
+func (c *Config) UnmarshalYAML(value *yaml.Node) error {
+	// Create a temporary struct with raw auth data
+	var raw struct {
+		Name    string                 `yaml:"name"`
+		Type    string                 `yaml:"type"`
+		Address string                 `yaml:"address"`
+		Auth    map[string]interface{} `yaml:"auth"`
+	}
+
+	if err := value.Decode(&raw); err != nil {
+		return err
+	}
+
+	c.Name = raw.Name
+	c.Type = raw.Type
+	c.Address = raw.Address
+
+	// Handle auth based on method
+	if raw.Auth != nil {
+		method, ok := raw.Auth["method"].(string)
+		if !ok {
+			return fmt.Errorf("auth method must be a string")
+		}
+
+		switch method {
+		case "plain":
+			user, _ := raw.Auth["user"].(string)
+			password, _ := raw.Auth["password"].(string)
+			c.Auth = auth.BasicAuth{
+				Username: user,
+				Password: password,
+			}
+		case "token":
+			token, _ := raw.Auth["token"].(string)
+			c.Auth = auth.NatsToken{
+				Token: token,
+			}
+		default:
+			return fmt.Errorf("unsupported auth method: %s", method)
+		}
+	}
+
+	return nil
 }
 
 // NewBroker returns a Broker interface based on the config type (nats, iothub,...)
@@ -38,6 +88,7 @@ func NewBroker(cfg Config) (Broker, error) {
 	switch cfg.Type {
 	case nats.NATSType:
 		return nats.NewBroker(nats.Config{
+			Name: cfg.Name,
 			URL:  cfg.Address,
 			Auth: cfg.Auth,
 		}), nil

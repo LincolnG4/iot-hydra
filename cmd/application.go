@@ -58,20 +58,20 @@ func (a *application) mount() *gin.Engine {
 	return router
 }
 
-// func (a *application) startMessageAgent() {
-// 	go func() {
-// 		for {
-// 			select {
-// 			case msg := <-a.MessageQueue:
-// 				if err := a.IoTAgent.Route(&msg); err != nil {
-// 					a.logger.Error().Err(err).Msg("")
-// 				}
-// 			case <-a.ctx.Done():
-// 				a.logger.Info().Msg("iot message agent stopped")
-// 			}
-// 		}
-// 	}()
-// }
+func (a *application) startMessageAgent() {
+	go func() {
+		for {
+			select {
+			case msg := <-a.MessageQueue:
+				if err := a.IoTAgent.Route(&msg); err != nil {
+					a.logger.Error().Err(err).Msg("")
+				}
+			case <-a.ctx.Done():
+				a.logger.Info().Msg("iot message agent stopped")
+			}
+		}
+	}()
+}
 
 func (a *application) run(r *gin.Engine) error {
 	srv := &http.Server{
