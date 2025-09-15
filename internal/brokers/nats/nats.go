@@ -15,13 +15,13 @@ const (
 type NATS struct {
 	conn        Connector
 	isConnected bool
-	config      Config
+	Config      Config
 }
 
 func NewBroker(cfg Config) *NATS {
 	return &NATS{
 		isConnected: false,
-		config:      cfg,
+		Config:      cfg,
 	}
 }
 
@@ -32,7 +32,7 @@ type Config struct {
 }
 
 func (n *NATS) Name() string {
-	return n.config.Name
+	return n.Config.Name
 }
 
 func (n *NATS) Type() string {
@@ -41,8 +41,8 @@ func (n *NATS) Type() string {
 
 func (n *NATS) Connect() error {
 	opts := &auth.ConnectOptions{}
-	if n.config.Auth != nil {
-		if err := n.config.Auth.Apply(opts); err != nil {
+	if n.Config.Auth != nil {
+		if err := n.Config.Auth.Apply(opts); err != nil {
 			return err
 		}
 	}
@@ -57,7 +57,7 @@ func (n *NATS) Connect() error {
 	}
 
 	var err error
-	n.conn, err = nats.Connect(n.config.URL, ncOpts...)
+	n.conn, err = nats.Connect(n.Config.URL, ncOpts...)
 	if err != nil {
 		return err
 	}
@@ -94,4 +94,8 @@ func (n *NATS) SubscribeAndWait(topic string, waitSecond time.Duration) (*messag
 		Topic:   topic,
 		Type:    NATSType,
 	}, nil
+}
+
+func (n *NATS) AuthMethod() string {
+	return n.Config.Auth.Type()
 }

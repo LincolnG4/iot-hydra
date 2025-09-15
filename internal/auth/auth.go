@@ -2,6 +2,7 @@ package auth
 
 type Authenticator interface {
 	Apply(opts *ConnectOptions) error
+	Type() string
 }
 
 // ConnectOptions is a generic bag for connection parameters.
@@ -14,6 +15,8 @@ type ConnectOptions struct {
 	KeyFile  string
 }
 
+const BasicType = "plain"
+
 type BasicAuth struct {
 	Username string
 	Password string
@@ -25,11 +28,21 @@ func (b BasicAuth) Apply(opts *ConnectOptions) error {
 	return nil
 }
 
+func (b BasicAuth) Type() string {
+	return BasicType
+}
+
+const NatsTokenType = "natsToken"
+
 type NatsToken struct {
 	Token string
 }
 
-func (t NatsToken) Apply(opts *ConnectOptions) error {
-	opts.Token = t.Token
+func (n NatsToken) Apply(opts *ConnectOptions) error {
+	opts.Token = n.Token
 	return nil
+}
+
+func (n NatsToken) Type() string {
+	return NatsTokenType
 }

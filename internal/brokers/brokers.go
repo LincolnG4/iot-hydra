@@ -16,6 +16,8 @@ type Broker interface {
 	// Broker type
 	Type() string
 
+	// Method of Authentication
+	AuthMethod() string
 	// Connect to the broker
 	Connect() error
 
@@ -63,14 +65,14 @@ func (c *Config) UnmarshalYAML(value *yaml.Node) error {
 		}
 
 		switch method {
-		case "plain":
+		case auth.BasicType:
 			user, _ := raw.Auth["user"].(string)
 			password, _ := raw.Auth["password"].(string)
 			c.Auth = auth.BasicAuth{
 				Username: user,
 				Password: password,
 			}
-		case "token":
+		case auth.NatsTokenType:
 			token, _ := raw.Auth["token"].(string)
 			c.Auth = auth.NatsToken{
 				Token: token,
