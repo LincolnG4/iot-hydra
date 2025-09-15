@@ -7,7 +7,7 @@ import (
 
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 
-	"github.com/LincolnG4/iot-hydra/internal/message"
+	"github.com/LincolnG4/iot-hydra/internal/agent"
 	"github.com/LincolnG4/iot-hydra/internal/runtimer"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
@@ -17,9 +17,11 @@ type application struct {
 	PodmanRuntime runtimer.PodmanRuntime
 	logger        *zerolog.Logger
 	config        *config
-	MessageQueue  chan message.Message
-	ctx           context.Context
-	cancel        context.CancelFunc
+
+	// Telemetry Agent
+	ctx            context.Context
+	cancel         *context.CancelFunc
+	TelemetryAgent *agent.TelemetryAgent
 }
 
 type config struct {
@@ -58,16 +60,17 @@ func (a *application) mount() *gin.Engine {
 	return router
 }
 
-func (a *application) startMessageAgent() {
+func (a *application) startTelemetryAgent() {
+	a.TelemetryAgent.Start()
 	go func() {
 		for {
 			select {
-			case msg := <-a.MessageQueue:
-				if err := a.IoTAgent.Route(&msg); err != nil {
+			case msg := <-a.TelemetryAgent.Queue:
+				if err := a.TelemetryAgent.RouteToBrokers(msg); err != nil {
 					a.logger.Error().Err(err).Msg("")
 				}
 			case <-a.ctx.Done():
-				a.logger.Info().Msg("iot message agent stopped")
+				a.logger.Info().Msg("telemtry agent stopped")
 			}
 		}
 	}()

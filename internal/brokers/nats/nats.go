@@ -74,6 +74,7 @@ func (n *NATS) Stop() error {
 }
 
 func (n *NATS) Publish(msg *message.Message) error {
+	// TODO: Add from where the message came
 	return n.conn.Publish(msg.Topic, msg.Payload)
 }
 
@@ -90,9 +91,9 @@ func (n *NATS) SubscribeAndWait(topic string, waitSecond time.Duration) (*messag
 	}
 
 	return &message.Message{
-		Payload: msg.Data,
-		Topic:   topic,
-		Type:    NATSType,
+		Payload:      msg.Data,
+		Topic:        topic,
+		SourceBroker: n.Name(),
 	}, nil
 }
 

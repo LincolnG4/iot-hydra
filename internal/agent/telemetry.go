@@ -20,6 +20,27 @@ type TelemetryAgent struct {
 	Brokers map[string]brokers.Broker
 }
 
+// Start init the TelemetryAgent
+func (t *TelemetryAgent) Start() {
+	t.Queue = make(chan *message.Message, t.QueueSize)
+}
+
+func (t *TelemetryAgent) RouteToBrokers(msg *message.Message) error {
+	for _, brokerName := range msg.TargetBrokers {
+		b, exist := t.Brokers[brokerName]
+		if !exist {
+			// TODO: FIX < DONT STOP >
+			return fmt.Errorf("message not sent: broker %s is not configure", brokerName)
+		}
+
+		err := b.Publish(msg)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // UnmarshalYAML implements yaml.Unmarshaler.
 func (t *TelemetryAgent) UnmarshalYAML(value *yaml.Node) error {
 	var raw struct {
