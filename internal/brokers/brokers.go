@@ -33,7 +33,7 @@ type Broker interface {
 }
 
 type Config struct {
-	Name    string             `yaml:"name"`
+	Name    string             `yaml:"name" validate:"required,min=1,max=50"`
 	Type    string             `yaml:"type"`
 	Address string             `yaml:"address"`
 	Auth    auth.Authenticator `yaml:"auth"`

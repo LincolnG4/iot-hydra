@@ -3,7 +3,6 @@ package main
 import (
 	"os"
 
-	"github.com/LincolnG4/iot-hydra/internal/message"
 	"github.com/LincolnG4/iot-hydra/internal/runtimer"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -51,9 +50,6 @@ func main() {
 		config: &config{
 			Addr: ":8080",
 		},
-
-		// TODO: add config number of messages in the queue
-		MessageQueue: make(chan message.Message, 10000),
 	}
 
 	mux := app.mount()

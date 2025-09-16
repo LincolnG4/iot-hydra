@@ -14,7 +14,7 @@ type TelemetryAgent struct {
 
 	// Queue is responsible forward the messages to the external brokers
 	Queue     chan *message.Message
-	QueueSize int `yaml:"queueSize"`
+	QueueSize int `yaml:"queueSize" validate:"required,min=1,max=50"`
 
 	// Map of brokers connected
 	Brokers map[string]brokers.Broker
@@ -22,6 +22,7 @@ type TelemetryAgent struct {
 
 // Start init the TelemetryAgent
 func (t *TelemetryAgent) Start() {
+	// TODO: Add a debug message
 	t.Queue = make(chan *message.Message, t.QueueSize)
 }
 

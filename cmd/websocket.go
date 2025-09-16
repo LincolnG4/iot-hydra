@@ -23,7 +23,7 @@ func (a *application) websocketIoTHandler(c *gin.Context) {
 
 	a.logger.Info().Msg("Client connected to Web Socket")
 	for {
-		msg := brokers.Message{}
+		msg := message. 
 		err := conn.ReadJSON(&msg)
 		if err != nil {
 			a.logger.Error().Err(fmt.Errorf("WebSocket error: %v", err)).Msg("")
