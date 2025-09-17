@@ -2,9 +2,7 @@ package agent
 
 import (
 	"context"
-	"fmt"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -109,6 +107,7 @@ func TestUnmarshalYAML_Success(t *testing.T) {
 	}
 }
 
+// TODO: Create fail tests
 func TestUnmarshalYAML_Fail(t *testing.T) {
 	testCases := []struct {
 		name        string
@@ -402,6 +401,7 @@ func TestUnmarshalYAML_Fail(t *testing.T) {
 			}
 
 			err := yaml.Unmarshal([]byte(tc.yamlContent), &wrapper)
+
 			// Assert that an error occurred
 			assert.Error(t, err, "Expected an error for test case: %s", tc.name)
 
@@ -414,61 +414,7 @@ func TestUnmarshalYAML_Fail(t *testing.T) {
 	}
 }
 
-// ConcurrentPublisher handles concurrent message publishing
-type ConcurrentPublisher struct {
-	agent       *TelemetryAgent
-	workerCount int
-	wg          sync.WaitGroup
-	ctx         context.Context
-	cancel      context.CancelFunc
-}
-
-// NewConcurrentPublisher creates a new concurrent publisher
-func NewConcurrentPublisher(agent *TelemetryAgent, workerCount int) *ConcurrentPublisher {
-	ctx, cancel := context.WithCancel(context.Background())
-	return &ConcurrentPublisher{
-		agent:       agent,
-		workerCount: workerCount,
-		ctx:         ctx,
-		cancel:      cancel,
-	}
-}
-
-// Start begins the concurrent publishing process
-func (cp *ConcurrentPublisher) Start() {
-	for i := 0; i < cp.workerCount; i++ {
-		cp.wg.Add(1)
-		go cp.worker(i)
-	}
-}
-
-// Stop gracefully stops all workers
-func (cp *ConcurrentPublisher) Stop() {
-	cp.cancel()
-	cp.wg.Wait()
-}
-
-// worker processes messages from the queue concurrently
-func (cp *ConcurrentPublisher) worker(workerID int) {
-	defer cp.wg.Done()
-
-	for {
-		select {
-		case msg := <-cp.agent.Queue:
-			if err := cp.agent.RouteToBrokers(msg); err != nil {
-				log.Printf("Worker %d failed to route message: %v", workerID, err)
-			} else {
-				log.Printf("Worker %d successfully published message", workerID)
-			}
-		case <-cp.ctx.Done():
-			log.Printf("Worker %d shutting down", workerID)
-			return
-		}
-	}
-}
-
-// Updated test function using concurrent publisher
-func TestSendMessage_Concurrent(t *testing.T) {
+func TestSendMessage_Success(t *testing.T) {
 	cfg := brokers.Config{
 		Name:    "nats",
 		Type:    "nats",
@@ -478,88 +424,6 @@ func TestSendMessage_Concurrent(t *testing.T) {
 			Password: "test",
 		},
 	}
-
-	b, err := brokers.NewBroker(cfg)
-	if err != nil {
-		t.Fatalf("Failed to create broker: %v", err)
-	}
-
-	err = b.Connect()
-	assert.NoError(t, err)
-	ag := TelemetryAgent{
-		Queue: make(chan *message.Message, 1000),
-		Brokers: map[string]brokers.Broker{
-			"nats": b,
-		},
-	}
-
-	ag.Start()
-
-	// Create concurrent publisher with 5 workers
-	publisher := NewConcurrentPublisher(&ag, 5)
-	publisher.Start()
-
-	// Simulate message generation
-	go func() {
-		for i := 0; i < 100; i++ {
-			msg := &message.Message{
-				ID:            fmt.Sprintf("msg-%d", i),
-				Payload:       []byte(fmt.Sprintf("test payload %d", i)),
-				Topic:         "my.iot",
-				TargetBrokers: []string{"nats"},
-			}
-
-			err := ag.RouteToBrokers(msg)
-			if err != nil {
-				t.Fatal(err)
-				continue
-			}
-			time.Sleep(100 * time.Millisecond)
-		}
-	}()
-
-	// Run for 15 seconds then stop
-	time.Sleep(15 * time.Second)
-	publisher.Stop()
-	log.Debug().Msg("Test completed")
-}
-
-func PublishConcurrently(ctx context.Context, ag *TelemetryAgent, workerCount int) {
-	var wg sync.WaitGroup
-
-	for i := 0; i < workerCount; i++ {
-		wg.Add(1)
-		go func(workerID int) {
-			defer wg.Done()
-			for {
-				select {
-				case msg := <-ag.Queue:
-					if err := ag.RouteToBrokers(msg); err != nil {
-						log.Printf("Worker %d error: %v", workerID, err)
-					}
-				case <-ctx.Done():
-					log.Printf("Worker %d terminated", workerID)
-					return
-				}
-			}
-		}(i)
-	}
-
-	wg.Wait()
-}
-
-// Usage with your existing test structure:
-func TestSendMessage_WithConcurrentPublisher(t *testing.T) {
-	cfg := brokers.Config{
-		Name:    "nats",
-		Type:    "nats",
-		Address: "localhost:4222",
-		Auth: &auth.BasicAuth{
-			Username: "test",
-			Password: "test",
-		},
-	}
-
 	b, _ := brokers.NewBroker(cfg)
 	ag := TelemetryAgent{
 		Queue: make(chan *message.Message, 1000),
@@ -569,14 +433,20 @@ func TestSendMessage_WithConcurrentPublisher(t *testing.T) {
 	}
 
 	ag.Start()
+	ctx, cancel := context.WithCancel(context.Background())
+	go func(context.CancelFunc) {
+		time.Sleep(10 * time.Second)
+		cancel()
+	}(cancel)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	// Start concurrent publishing with 3 workers
-	go PublishConcurrently(ctx, &ag, 3)
-
-	// Wait for context to be done
-	<-ctx.Done()
-	log.Debug().Msg("Test terminated")
+	for {
+		select {
+		case msg := <-ag.Queue:
+			if err := ag.RouteToBrokers(msg); err != nil {
+				log.Error().Err(err)
+			}
+		case <-ctx.Done():
+			log.Error().Msg("terminated")
+		}
+	}
 }

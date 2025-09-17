@@ -6,28 +6,27 @@ import (
 )
 
 type Authenticator interface {
-	Apply(opts *ConnectOptions) error
-	Type() string
+	// returns the method of authentication (sas,token,plain)
+	AuthMethod() string
+
+	// validate if all fields are correct. if not correct, it returns an error
+	validate() error
 }
 
-// ConnectOptions is a generic bag for connection parameters.
-// Each broker adapter can interpret what it needs.
-type ConnectOptions struct {
-	Username string
-	Password string
-	Token    string
-	CertFile string
-	KeyFile  string
-}
+/*
+* Plain Text
+ */
 
 const BasicType = "plain"
 
 type BasicAuth struct {
-	Username string `json:"user" yaml:"user"`
-	Password string `json:"password" yaml:"password"`
+	Username string `json:"user" yaml:"user" validate:"required_with=Password"`
+	Password string `json:"password" yaml:"password" validate:"required_with=Username"`
 }
 
-func (b BasicAuth) Apply(opts *ConnectOptions) error {
+func (b BasicAuth) AuthMethod() string { return BasicType }
+
+func (b BasicAuth) validate() error {
 	// Validate required fields
 	if strings.TrimSpace(b.Username) == "" {
 		return errors.New("username cannot be empty")
@@ -35,63 +34,26 @@ func (b BasicAuth) Apply(opts *ConnectOptions) error {
 	if strings.TrimSpace(b.Password) == "" {
 		return errors.New("password cannot be empty")
 	}
-	opts.Username = strings.TrimSpace(b.Username)
-	opts.Password = b.Password
 
-	return opts.Validate()
+	return nil
 }
 
-func (b BasicAuth) Type() string {
-	return BasicType
+/*
+* Token
+ */
+
+const TokenType = "Token"
+
+type Token struct {
+	Token string `json:"token" yaml:"token" validate:"required"`
 }
 
-const NatsTokenType = "natsToken"
+func (n Token) AuthMethod() string { return TokenType }
 
-type NatsToken struct {
-	Token string `json:"token" yaml:"token"`
-}
-
-func (n NatsToken) Apply(opts *ConnectOptions) error {
-	if err := opts.Validate(); err != nil {
-		return err
-	}
-
+func (n Token) validate() error {
 	// Validate token
 	if strings.TrimSpace(n.Token) == "" {
 		return errors.New("token cannot be empty")
-	}
-
-	opts.Token = strings.TrimSpace(n.Token)
-	return opts.Validate()
-}
-
-func (n NatsToken) Type() string {
-	return NatsTokenType
-}
-
-func (opts *ConnectOptions) Validate() error {
-	// Check for conflicting auth methods
-	authMethods := 0
-	if opts.Username != "" || opts.Password != "" {
-		authMethods++
-	}
-	if opts.Token != "" {
-		authMethods++
-	}
-	if opts.CertFile != "" || opts.KeyFile != "" {
-		authMethods++
-	}
-
-	if authMethods == 0 {
-		return errors.New("no authentication method provided")
-	}
-	if authMethods > 1 {
-		return errors.New("multiple authentication methods provided, only one is allowed")
-	}
-
-	// Validate cert/key pair completeness
-	if (opts.CertFile != "" && opts.KeyFile == "") || (opts.CertFile == "" && opts.KeyFile != "") {
-		return errors.New("both CertFile and KeyFile must be provided for certificate authentication")
 	}
 
 	return nil

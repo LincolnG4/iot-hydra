@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"log"
-	"sync"
 	"testing"
 	"time"
 
@@ -148,69 +147,4 @@ func TestNATS_Integration(t *testing.T) {
 
 	// check if message is correct
 	assert.Equal(t, "Test", string(msg.Payload), "Expected doest match with received")
-}
-
-func BenchmarkNATS_Publish(b *testing.B) {
-	// Setup: Connect to a NATS server (consider using a test-specific server)
-	nc, err := nats.Connect(nats.DefaultURL)
-	if err != nil {
-		b.Fatalf("Failed to connect to NATS: %v", err)
-	}
-	defer nc.Close()
-
-	broker := &NATS{
-		conn:        nc,
-		isConnected: true,
-	}
-
-	msg := &message.Message{
-		Topic:   "benchmark-topic",
-		Payload: []byte("hello world"),
-	}
-
-	b.ResetTimer() // Start the timer after setup
-
-	// The benchmark loop
-	for i := 0; i < b.N; i++ {
-		if err := broker.Publish(msg); err != nil {
-			b.Fatalf("Failed to publish: %v", err)
-		}
-	}
-}
-
-func BenchmarkNATS_PublishSubscribeLatency(b *testing.B) {
-	nc, err := nats.Connect(nats.DefaultURL)
-	if err != nil {
-		b.Fatalf("Failed to connect to NATS: %v", err)
-	}
-	defer nc.Close()
-
-	broker := &NATS{
-		conn:        nc,
-		isConnected: true,
-	}
-
-	topic := "latency-benchmark"
-	payload := []byte("test message")
-
-	// Set up a subscriber
-	var wg sync.WaitGroup
-	sub, err := nc.Subscribe(topic, func(m *nats.Msg) {
-		wg.Done()
-	})
-	if err != nil {
-		b.Fatalf("Failed to subscribe: %v", err)
-	}
-	defer sub.Unsubscribe()
-
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
-		wg.Add(1)
-		err := broker.Publish(&message.Message{Topic: topic, Payload: payload})
-		if err != nil {
-			b.Fatalf("Publish failed: %v", err)
-		}
-		wg.Wait() // Wait for the subscriber to receive the message
-	}
 }

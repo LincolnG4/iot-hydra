@@ -16,8 +16,6 @@ type Broker interface {
 	// Broker type
 	Type() string
 
-	// Method of Authentication
-	AuthMethod() string
 	// Connect to the broker
 	Connect() error
 
@@ -33,10 +31,24 @@ type Broker interface {
 }
 
 type Config struct {
-	Name    string             `yaml:"name" validate:"required,min=1,max=50"`
-	Type    string             `yaml:"type"`
-	Address string             `yaml:"address"`
+	Name    string             `yaml:"name" validate:"required,min=1,max=255"`
+	Type    string             `yaml:"type" validate:"required"`
+	Address string             `yaml:"address" validate:"required"`
 	Auth    auth.Authenticator `yaml:"auth"`
+}
+
+// NewBroker returns a Broker interface based on the config type (nats, iothub,...)
+func NewBroker(cfg Config) (Broker, error) {
+	switch cfg.Type {
+	case nats.NATSType:
+		return nats.NewBroker(nats.Config{
+			Name: cfg.Name,
+			URL:  cfg.Address,
+			Auth: cfg.Auth,
+		}), nil
+	default:
+		return nil, fmt.Errorf("broker type %s not allowed", cfg.Type)
+	}
 }
 
 // Custom unmarshaling for Config
@@ -72,9 +84,9 @@ func (c *Config) UnmarshalYAML(value *yaml.Node) error {
 				Username: user,
 				Password: password,
 			}
-		case auth.NatsTokenType:
+		case auth.TokenType:
 			token, _ := raw.Auth["token"].(string)
-			c.Auth = auth.NatsToken{
+			c.Auth = auth.Token{
 				Token: token,
 			}
 		default:
@@ -83,18 +95,4 @@ func (c *Config) UnmarshalYAML(value *yaml.Node) error {
 	}
 
 	return nil
-}
-
-// NewBroker returns a Broker interface based on the config type (nats, iothub,...)
-func NewBroker(cfg Config) (Broker, error) {
-	switch cfg.Type {
-	case nats.NATSType:
-		return nats.NewBroker(nats.Config{
-			Name: cfg.Name,
-			URL:  cfg.Address,
-			Auth: cfg.Auth,
-		}), nil
-	default:
-		return &nats.NATS{}, fmt.Errorf("broker type %s not allowed", cfg.Type)
-	}
 }

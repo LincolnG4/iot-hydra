@@ -1,6 +1,7 @@
 package nats
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/LincolnG4/iot-hydra/internal/auth"
@@ -40,24 +41,19 @@ func (n *NATS) Type() string {
 }
 
 func (n *NATS) Connect() error {
-	opts := &auth.ConnectOptions{}
-	if n.Config.Auth != nil {
-		if err := n.Config.Auth.Apply(opts); err != nil {
-			return err
-		}
-	}
+	var natsOpts []nats.Option
 
-	// Build NATS options
-	ncOpts := []nats.Option{}
-	if opts.Token != "" {
-		ncOpts = append(ncOpts, nats.Token(opts.Token))
-	}
-	if opts.Username != "" && opts.Password != "" {
-		ncOpts = append(ncOpts, nats.UserInfo(opts.Username, opts.Password))
+	switch authConfig := n.Config.Auth.(type) {
+	case auth.BasicAuth:
+		natsOpts = append(natsOpts, nats.UserInfo(authConfig.Username, authConfig.Password))
+	case auth.Token:
+		natsOpts = append(natsOpts, nats.Token(authConfig.Token))
+	default:
+		return fmt.Errorf("method %s not allowed", authConfig)
 	}
 
 	var err error
-	n.conn, err = nats.Connect(n.Config.URL, ncOpts...)
+	n.conn, err = nats.Connect(n.Config.URL, natsOpts...)
 	if err != nil {
 		return err
 	}
@@ -95,8 +91,4 @@ func (n *NATS) SubscribeAndWait(topic string, waitSecond time.Duration) (*messag
 		Topic:        topic,
 		SourceBroker: n.Name(),
 	}, nil
-}
-
-func (n *NATS) AuthMethod() string {
-	return n.Config.Auth.Type()
 }
