@@ -78,15 +78,16 @@ func (c *Config) UnmarshalYAML(value *yaml.Node) error {
 
 		switch method {
 		case auth.BasicType:
+			// TODO: fix
 			user, _ := raw.Auth["user"].(string)
 			password, _ := raw.Auth["password"].(string)
-			c.Auth = auth.BasicAuth{
+			c.Auth = &auth.BasicAuth{
 				Username: user,
 				Password: password,
 			}
 		case auth.TokenType:
 			token, _ := raw.Auth["token"].(string)
-			c.Auth = auth.Token{
+			c.Auth = &auth.Token{
 				Token: token,
 			}
 		default:

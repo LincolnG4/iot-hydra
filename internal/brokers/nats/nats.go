@@ -41,18 +41,11 @@ func (n *NATS) Type() string {
 }
 
 func (n *NATS) Connect() error {
-	var natsOpts []nats.Option
-
-	switch authConfig := n.Config.Auth.(type) {
-	case auth.BasicAuth:
-		natsOpts = append(natsOpts, nats.UserInfo(authConfig.Username, authConfig.Password))
-	case auth.Token:
-		natsOpts = append(natsOpts, nats.Token(authConfig.Token))
-	default:
-		return fmt.Errorf("method %s not allowed", authConfig)
+	natsOpts, err := getCredentials(n.Config.Auth)
+	if err != nil {
+		return err
 	}
 
-	var err error
 	n.conn, err = nats.Connect(n.Config.URL, natsOpts...)
 	if err != nil {
 		return err
@@ -91,4 +84,20 @@ func (n *NATS) SubscribeAndWait(topic string, waitSecond time.Duration) (*messag
 		Topic:        topic,
 		SourceBroker: n.Name(),
 	}, nil
+}
+
+// getCredentials identify the type of authentication and returns the credentials for the broker.
+func getCredentials(a auth.Authenticator) ([]nats.Option, error) {
+	var natsOpts []nats.Option
+
+	switch authConfig := a.(type) {
+	case *auth.BasicAuth:
+		natsOpts = append(natsOpts, nats.UserInfo(authConfig.Username, authConfig.Password))
+	case *auth.Token:
+		natsOpts = append(natsOpts, nats.Token(authConfig.Token))
+	default:
+		return nil, fmt.Errorf("method %s not allowed", authConfig)
+	}
+
+	return natsOpts, nil
 }

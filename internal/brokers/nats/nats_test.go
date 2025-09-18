@@ -11,7 +11,6 @@ import (
 	"github.com/LincolnG4/iot-hydra/internal/message"
 	"github.com/alecthomas/assert"
 	"github.com/nats-io/nats.go"
-	"github.com/testcontainers/testcontainers-go"
 	testnats "github.com/testcontainers/testcontainers-go/modules/nats"
 )
 
@@ -110,41 +109,170 @@ func TestNATS_Stop(t *testing.T) {
 func TestNATS_Integration(t *testing.T) {
 	ctx := context.Background()
 
-	c, err := testnats.Run(ctx,
+	natsContainer, err := testnats.Run(ctx,
 		"nats:2.9",
-		testnats.WithArgument("server_name", "nats://localhost:4222"),
-		testnats.WithUsername("foo"), testnats.WithPassword("bar"))
+		testnats.WithUsername("foo"),
+		testnats.WithPassword("bar"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer func() {
-		if err := testcontainers.TerminateContainer(c); err != nil {
+		if err := natsContainer.Terminate(ctx); err != nil {
 			log.Printf("failed to terminate container: %s", err)
 		}
 	}()
+
+	mappedURL, err := natsContainer.ConnectionString(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	cfg := Config{
-		URL: "nats://localhost:4222",
-		Auth: auth.BasicAuth{
-			Username: "foo",
-			Password: "bar",
+	tests := []struct {
+		name string
+		cfg  Config
+	}{
+		{
+			name: "Connect with BasicAuth",
+			cfg: Config{
+				URL: mappedURL,
+				Auth: &auth.BasicAuth{
+					Username: "foo",
+					Password: "bar",
+				},
+			},
 		},
 	}
 
-	// Create a NewBroker
-	nc := NewBroker(cfg)
-	err = nc.Connect()
-	assert.NoError(t, err, "Could not connect to the NATS container")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create and connect broker
+			broker := NewBroker(tt.cfg)
+			err := broker.Connect()
+			assert.NoError(t, err, "Could not connect to NATS container")
+			assert.True(t, broker.isConnected, "Broker should be connected")
 
-	go func() {
-		time.Sleep(1 * time.Second)
-		err := nc.Publish(&message.Message{Topic: "foo", Payload: []byte("Test")})
-		assert.NoError(t, err, "Could not publish on topic on NATS")
-	}()
+			// Publish in background
+			go func() {
+				time.Sleep(1 * time.Second)
+				err := broker.Publish(&message.Message{Topic: "foo", Payload: []byte("Test")})
+				assert.NoError(t, err, "Could not publish to NATS")
+			}()
 
-	msg, err := nc.SubscribeAndWait("foo", 2*time.Second)
-	assert.NoError(t, err, "Could not subcribe to topic on NATS")
+			// Subscribe and validate
+			msg, err := broker.SubscribeAndWait("foo", 2*time.Second)
+			assert.NoError(t, err, "Could not subscribe on NATS")
+			assert.Equal(t, "Test", string(msg.Payload))
+		})
+	}
+}
 
-	// check if message is correct
-	assert.Equal(t, "Test", string(msg.Payload), "Expected doest match with received")
+// Lightweight negative cases (no container needed)
+func TestNATS_ConnectFailures(t *testing.T) {
+	tests := []struct {
+		name             string
+		cfg              Config
+		expectError      bool
+		expectedErrorMsg string
+	}{
+		{
+			name: "Unsupported auth method",
+			cfg: Config{
+				URL:  "nats://localhost:4222",
+				Auth: &unsupportedAuth{},
+			},
+			expectError:      true,
+			expectedErrorMsg: "method &{} not allowed",
+		},
+		{
+			name: "Invalid host",
+			cfg: Config{
+				URL:  "nats://bad-host:4222",
+				Auth: &auth.BasicAuth{Username: "foo", Password: "bar"},
+			},
+			expectError:      true,
+			expectedErrorMsg: "lookup bad-host", // or "connection refused", depending on env
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			broker := NewBroker(tt.cfg)
+			err := broker.Connect()
+
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedErrorMsg)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+type unsupportedAuth struct{}
+
+func (u *unsupportedAuth) AuthMethod() string { return "unsupported" }
+func (u *unsupportedAuth) Validate() error    { return nil }
+
+func TestGetCredentials(t *testing.T) {
+	tests := []struct {
+		name        string
+		authInput   auth.Authenticator
+		expectError bool
+	}{
+		{
+			name: "basic auth valid",
+			authInput: &auth.BasicAuth{
+				Username: "testuser",
+				Password: "testpass",
+			},
+			expectError: false,
+		},
+		{
+			name: "token auth valid",
+			authInput: &auth.Token{
+				Token: "sometoken",
+			},
+			expectError: false,
+		},
+		{
+			name:        "unsupported auth type",
+			authInput:   &unsupportedAuth{},
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts, err := getCredentials(tt.authInput)
+
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("expected error but got none")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+
+			if len(opts) == 0 {
+				t.Errorf("expected at least one nats.Option, got none")
+			}
+
+			// Apply the option to a dummy nats.Options to verify it doesn't panic
+			natsOpts := nats.Options{}
+			for _, o := range opts {
+				if o == nil {
+					t.Errorf("received nil nats.Option")
+				}
+				err := o(&natsOpts)
+				if err != nil {
+					t.Errorf("option application failed: %v", err)
+				}
+			}
+		})
+	}
 }

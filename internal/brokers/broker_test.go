@@ -12,7 +12,7 @@ func TestNewBroker(t *testing.T) {
 	cfg := Config{
 		Type:    nats.NATSType,
 		Address: "nats://localhost:4222",
-		Auth: auth.BasicAuth{
+		Auth: &auth.BasicAuth{
 			Username: "foo",
 			Password: "bar",
 		},

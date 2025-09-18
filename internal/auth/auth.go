@@ -3,6 +3,8 @@ package auth
 import (
 	"errors"
 	"strings"
+
+	"github.com/LincolnG4/iot-hydra/internal/utils"
 )
 
 type Authenticator interface {
@@ -10,7 +12,7 @@ type Authenticator interface {
 	AuthMethod() string
 
 	// validate if all fields are correct. if not correct, it returns an error
-	validate() error
+	Validate() error
 }
 
 /*
@@ -24,9 +26,13 @@ type BasicAuth struct {
 	Password string `json:"password" yaml:"password" validate:"required_with=Username"`
 }
 
-func (b BasicAuth) AuthMethod() string { return BasicType }
+func (b *BasicAuth) AuthMethod() string { return BasicType }
 
-func (b BasicAuth) validate() error {
+func (b *BasicAuth) Validate() error {
+	err := utils.Validate.Struct(b)
+	if err != nil {
+		return err
+	}
 	// Validate required fields
 	if strings.TrimSpace(b.Username) == "" {
 		return errors.New("username cannot be empty")
@@ -42,17 +48,22 @@ func (b BasicAuth) validate() error {
 * Token
  */
 
-const TokenType = "Token"
+const TokenType = "token"
 
 type Token struct {
 	Token string `json:"token" yaml:"token" validate:"required"`
 }
 
-func (n Token) AuthMethod() string { return TokenType }
+func (t *Token) AuthMethod() string { return TokenType }
 
-func (n Token) validate() error {
+func (t *Token) Validate() error {
+	err := utils.Validate.Struct(t)
+	if err != nil {
+		return err
+	}
+
 	// Validate token
-	if strings.TrimSpace(n.Token) == "" {
+	if strings.TrimSpace(t.Token) == "" {
 		return errors.New("token cannot be empty")
 	}
 
