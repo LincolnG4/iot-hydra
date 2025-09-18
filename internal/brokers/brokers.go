@@ -53,7 +53,7 @@ func NewBroker(cfg Config) (Broker, error) {
 
 // Custom unmarshaling for Config
 func (c *Config) UnmarshalYAML(value *yaml.Node) error {
-	// Create a temporary struct with raw auth data
+	// A temporary struct to decode the YAML into
 	var raw struct {
 		Name    string                 `yaml:"name"`
 		Type    string                 `yaml:"type"`
@@ -65,6 +65,16 @@ func (c *Config) UnmarshalYAML(value *yaml.Node) error {
 		return err
 	}
 
+	if raw.Name == "" {
+		return fmt.Errorf("broker config requires a 'name'")
+	}
+	if raw.Type == "" {
+		return fmt.Errorf("broker config requires a 'type'")
+	}
+	if raw.Address == "" {
+		return fmt.Errorf("broker config requires an 'address'")
+	}
+
 	c.Name = raw.Name
 	c.Type = raw.Type
 	c.Address = raw.Address
@@ -73,20 +83,32 @@ func (c *Config) UnmarshalYAML(value *yaml.Node) error {
 	if raw.Auth != nil {
 		method, ok := raw.Auth["method"].(string)
 		if !ok {
-			return fmt.Errorf("auth method must be a string")
+			return fmt.Errorf("auth 'method' must be a string")
 		}
 
 		switch method {
 		case auth.BasicType:
-			// TODO: fix
-			user, _ := raw.Auth["user"].(string)
-			password, _ := raw.Auth["password"].(string)
+			user, ok := raw.Auth["user"].(string)
+			if !ok {
+				return fmt.Errorf("auth method 'plain' requires a 'user' string")
+			}
+
+			password, ok := raw.Auth["password"].(string)
+			if !ok {
+				return fmt.Errorf("auth method 'plain' requires a 'password' string")
+			}
+
 			c.Auth = &auth.BasicAuth{
 				Username: user,
 				Password: password,
 			}
+
 		case auth.TokenType:
-			token, _ := raw.Auth["token"].(string)
+			token, ok := raw.Auth["token"].(string)
+			if !ok {
+				return fmt.Errorf("auth method 'token' requires a 'token' string")
+			}
+
 			c.Auth = &auth.Token{
 				Token: token,
 			}

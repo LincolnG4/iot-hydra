@@ -60,7 +60,7 @@ func TestBasicAuth_validate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.auth.validate()
+			err := tt.auth.Validate()
 			if (err != nil) != tt.wantErr {
 				t.Errorf("BasicAuth.validate() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -108,7 +108,7 @@ func TestToken_validate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.auth.validate()
+			err := tt.auth.Validate()
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Token.validate() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -136,7 +136,7 @@ func TestAuthenticatorInterface(t *testing.T) {
 				t.Errorf("%T.AuthMethod() returned an empty string", a)
 			}
 
-			_ = a.validate()
+			_ = a.Validate()
 		})
 	}
 }

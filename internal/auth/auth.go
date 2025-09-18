@@ -3,8 +3,6 @@ package auth
 import (
 	"errors"
 	"strings"
-
-	"github.com/LincolnG4/iot-hydra/internal/utils"
 )
 
 type Authenticator interface {
@@ -29,11 +27,6 @@ type BasicAuth struct {
 func (b *BasicAuth) AuthMethod() string { return BasicType }
 
 func (b *BasicAuth) Validate() error {
-	err := utils.Validate.Struct(b)
-	if err != nil {
-		return err
-	}
-	// Validate required fields
 	if strings.TrimSpace(b.Username) == "" {
 		return errors.New("username cannot be empty")
 	}
@@ -57,11 +50,6 @@ type Token struct {
 func (t *Token) AuthMethod() string { return TokenType }
 
 func (t *Token) Validate() error {
-	err := utils.Validate.Struct(t)
-	if err != nil {
-		return err
-	}
-
 	// Validate token
 	if strings.TrimSpace(t.Token) == "" {
 		return errors.New("token cannot be empty")
