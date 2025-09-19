@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 
+	"github.com/LincolnG4/iot-hydra/internal/config"
 	"github.com/LincolnG4/iot-hydra/internal/runtimer"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -13,6 +14,22 @@ func main() {
 	logger := zerolog.New(os.Stdout).Level(zerolog.InfoLevel)
 
 	log.Info().Msg("starting IoT runtime")
+
+	// load configuration file
+	configFile, exist := os.LookupEnv("yaml_config_path")
+	if !exist {
+		log.Error().Msg("environment variable 'yaml_config_path' not define. Please add the path to the service configuration file")
+		os.Exit(1)
+	}
+
+	// create service configuration structure
+	log.Debug().Msg("config loaded from " + configFile)
+	cfg, err := config.NewConfigFromYAML(configFile)
+	if err != nil {
+		log.Error().Err(err)
+		os.Exit(1)
+	}
+
 	// OpenTelemetry setup
 	log.Debug().Msg("starting OpenTelemetry")
 	// Handle SIGINT (CTRL+C) gracefully.
@@ -45,11 +62,8 @@ func main() {
 
 	app := application{
 		PodmanRuntime: &podmanRuntime,
-		// IoTAgent:      &iotagent,
-		logger: &logger,
-		config: &config{
-			Addr: ":8080",
-		},
+		logger:        &logger,
+		config:        &cfg,
 	}
 
 	mux := app.mount()

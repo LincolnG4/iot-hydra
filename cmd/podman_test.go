@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/LincolnG4/iot-hydra/internal/config"
 	"github.com/LincolnG4/iot-hydra/internal/runtimer"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
@@ -19,7 +20,11 @@ func newTestRouter(m *runtimer.MockPodmanManager) *gin.Engine {
 	app := &application{
 		PodmanRuntime: m,
 		logger:        &logger,
-		config:        &config{Addr: ":0"},
+		config: &config.ConfigYAML{
+			APIService: config.Service{
+				Address: ":0",
+			},
+		},
 	}
 	return app.mount()
 }

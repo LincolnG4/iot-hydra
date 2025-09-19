@@ -73,7 +73,7 @@ func TestBasicAuth_validate(t *testing.T) {
 }
 
 func TestToken_AuthMethod(t *testing.T) {
-	tok := Token{}
+	tok := TokenAuth{}
 	expected := TokenType
 	if tok.AuthMethod() != expected {
 		t.Errorf("Token.AuthMethod() got = %s, want %s", tok.AuthMethod(), expected)
@@ -83,24 +83,24 @@ func TestToken_AuthMethod(t *testing.T) {
 func TestToken_validate(t *testing.T) {
 	tests := []struct {
 		name     string
-		auth     Token
+		auth     TokenAuth
 		wantErr  bool
 		errMatch string
 	}{
 		{
 			name:    "Valid token",
-			auth:    Token{Token: "some-secret-token"},
+			auth:    TokenAuth{Token: "some-secret-token"},
 			wantErr: false,
 		},
 		{
 			name:     "Empty token",
-			auth:     Token{Token: ""},
+			auth:     TokenAuth{Token: ""},
 			wantErr:  true,
 			errMatch: "token cannot be empty",
 		},
 		{
 			name:     "Whitespace token",
-			auth:     Token{Token: "   "},
+			auth:     TokenAuth{Token: "   "},
 			wantErr:  true,
 			errMatch: "token cannot be empty",
 		},
@@ -120,11 +120,10 @@ func TestToken_validate(t *testing.T) {
 	}
 }
 
-// Optional: Test the Authenticator interface contract itself
 func TestAuthenticatorInterface(t *testing.T) {
 	auths := []Authenticator{
 		&BasicAuth{},
-		&Token{},
+		&TokenAuth{},
 		// Add other Authenticator implementations here as they are created
 	}
 

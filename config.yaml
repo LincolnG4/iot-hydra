@@ -1,3 +1,5 @@
+apiService:
+  address: ":8080"
 telemetryAgent:
   queueSize: 1000
   brokers:
@@ -5,7 +7,6 @@ telemetryAgent:
       type: nats
       address: "localhost:4222"
       auth:
-        method: plain 
+        method: plain
         user: test
         password: test
-

@@ -8,24 +8,25 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 
 	"github.com/LincolnG4/iot-hydra/internal/agent"
+	"github.com/LincolnG4/iot-hydra/internal/config"
 	"github.com/LincolnG4/iot-hydra/internal/runtimer"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
 )
 
 type application struct {
+	// responsible to manage podman service
 	PodmanRuntime runtimer.PodmanRuntime
 	logger        *zerolog.Logger
-	config        *config
 
-	// Telemetry Agent
-	ctx            context.Context
-	cancel         *context.CancelFunc
+	// configuration loaded from config.yaml file
+	config *config.ConfigYAML
+
+	ctx    context.Context
+	cancel *context.CancelFunc
+
+	// agent responsible to route telemetry messsages to the brokers
 	TelemetryAgent *agent.TelemetryAgent
-}
-
-type config struct {
-	Addr string
 }
 
 func (a *application) mount() *gin.Engine {
@@ -56,12 +57,16 @@ func (a *application) mount() *gin.Engine {
 		}
 
 	}
-
 	return router
 }
 
-func (a *application) startTelemetryAgent() {
-	a.TelemetryAgent.Start()
+func (a *application) startTelemetryAgent() error {
+	var err error
+	a.TelemetryAgent, err = agent.NewTelemetryAgent(&a.config.TelemetryAgent)
+	if err != nil {
+		return err
+	}
+
 	go func() {
 		for {
 			select {
@@ -70,15 +75,16 @@ func (a *application) startTelemetryAgent() {
 					a.logger.Error().Err(err).Msg("")
 				}
 			case <-a.ctx.Done():
-				a.logger.Info().Msg("telemtry agent stopped")
+				a.logger.Info().Msg("telemetry agent stopped")
 			}
 		}
 	}()
+	return nil
 }
 
 func (a *application) run(r *gin.Engine) error {
 	srv := &http.Server{
-		Addr:         ":8080",
+		Addr:         a.config.APIService.Address,
 		Handler:      r,
 		WriteTimeout: 30 * time.Second,
 		ReadTimeout:  10 * time.Second,

@@ -93,7 +93,7 @@ func getCredentials(a auth.Authenticator) ([]nats.Option, error) {
 	switch authConfig := a.(type) {
 	case *auth.BasicAuth:
 		natsOpts = append(natsOpts, nats.UserInfo(authConfig.Username, authConfig.Password))
-	case *auth.Token:
+	case *auth.TokenAuth:
 		natsOpts = append(natsOpts, nats.Token(authConfig.Token))
 	default:
 		return nil, fmt.Errorf("method %s not allowed", authConfig)

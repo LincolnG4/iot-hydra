@@ -4,26 +4,67 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/LincolnG4/iot-hydra/internal/auth"
 	"github.com/LincolnG4/iot-hydra/internal/brokers"
+	"github.com/LincolnG4/iot-hydra/internal/config"
 	"github.com/LincolnG4/iot-hydra/internal/message"
-	"gopkg.in/yaml.v3"
 )
 
 type TelemetryAgent struct {
 	ctx context.Context
 
-	// Queue is responsible forward the messages to the external brokers
-	Queue     chan *message.Message
-	QueueSize int `yaml:"queueSize" validate:"required,min=1,max=50"`
+	// Queue telemetry messages
+	Queue chan *message.Message
 
 	// Map of brokers connected
 	Brokers map[string]brokers.Broker
 }
 
-// Start init the TelemetryAgent
-func (t *TelemetryAgent) Start() {
-	// TODO: Add a debug message
-	t.Queue = make(chan *message.Message, t.QueueSize)
+// NewTelemetryAgent creates and configures a new TelemetryAgent.
+func NewTelemetryAgent(cfg *config.TelemetryAgentYAML) (*TelemetryAgent, error) {
+	if cfg == nil {
+		return nil, fmt.Errorf("configuration cannot be nil")
+	}
+
+	// The map of brokers is created to hold the initialized brokers.
+	brokerMap := make(map[string]brokers.Broker)
+
+	// loop through each broker configuration provided in the YAML file.
+	for _, brokerCfg := range cfg.Brokers {
+		//  create the authenticator
+		authenticator, err := auth.NewAuthenticator(brokerCfg.Auth)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create authenticator for broker '%s': %w", brokerCfg.Name, err)
+		}
+
+		// create the broker .
+		broker, err := brokers.NewBroker(brokers.Config{
+			Name:    brokerCfg.Name,
+			Type:    brokerCfg.Type,
+			Address: brokerCfg.Address,
+			Auth:    authenticator,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create broker '%s': %w", brokerCfg.Name, err)
+		}
+
+		// check for duplicate broker names to avoid conflicts.
+		name := broker.Name()
+		if _, exist := brokerMap[name]; exist {
+			return nil, fmt.Errorf("duplicate broker name: %s", name)
+		}
+
+		brokerMap[name] = broker
+	}
+
+	// The agent is assembled with the created brokers and a properly sized message queue.
+	agent := &TelemetryAgent{
+		Queue:   make(chan *message.Message, cfg.QueueSize),
+		Brokers: brokerMap,
+		ctx:     context.Background(),
+	}
+
+	return agent, nil
 }
 
 func (t *TelemetryAgent) RouteToBrokers(msg *message.Message) error {
@@ -39,37 +80,5 @@ func (t *TelemetryAgent) RouteToBrokers(msg *message.Message) error {
 			return err
 		}
 	}
-	return nil
-}
-
-// UnmarshalYAML implements yaml.Unmarshaler.
-func (t *TelemetryAgent) UnmarshalYAML(value *yaml.Node) error {
-	var raw struct {
-		QueueSize int              `yaml:"queueSize"`
-		Brokers   []brokers.Config `yaml:"brokers"`
-	}
-
-	if err := value.Decode(&raw); err != nil {
-		return err
-	}
-
-	t.QueueSize = raw.QueueSize
-
-	m := make(map[string]brokers.Broker)
-	for _, brokerCfg := range raw.Brokers {
-		broker, err := brokers.NewBroker(brokerCfg)
-		if err != nil {
-			return fmt.Errorf("failed to create broker: %v", err)
-		}
-
-		name := broker.Name()
-		if _, exist := m[name]; exist {
-			return fmt.Errorf("duplicate broker name: %s", name)
-		}
-
-		m[name] = broker
-	}
-
-	t.Brokers = m
 	return nil
 }

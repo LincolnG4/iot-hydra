@@ -231,7 +231,7 @@ func TestGetCredentials(t *testing.T) {
 		},
 		{
 			name: "token auth valid",
-			authInput: &auth.Token{
+			authInput: &auth.TokenAuth{
 				Token: "sometoken",
 			},
 			expectError: false,

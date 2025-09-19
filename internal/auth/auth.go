@@ -2,7 +2,10 @@ package auth
 
 import (
 	"errors"
+	"fmt"
 	"strings"
+
+	"github.com/LincolnG4/iot-hydra/internal/config"
 )
 
 type Authenticator interface {
@@ -13,11 +16,39 @@ type Authenticator interface {
 	Validate() error
 }
 
+const (
+	BasicType = "basic"
+	TokenType = "token"
+)
+
+// NewAuthenticator acts as a factory for creating an Authenticator.
+func NewAuthenticator(cfg config.AuthYAML) (Authenticator, error) {
+	switch cfg.Method {
+	case BasicType:
+		b := &BasicAuth{
+			Username: cfg.User,
+			Password: cfg.Password,
+		}
+		if err := b.Validate(); err != nil {
+			return nil, err
+		}
+		return b, nil
+	case TokenType:
+		t := &TokenAuth{
+			Token: cfg.Token,
+		}
+		if err := t.Validate(); err != nil {
+			return nil, err
+		}
+		return t, nil
+	default:
+		return nil, fmt.Errorf("authentication method '%s' is not supported", cfg.Method)
+	}
+}
+
 /*
 * Plain Text
  */
-
-const BasicType = "plain"
 
 type BasicAuth struct {
 	Username string `json:"user" yaml:"user" validate:"required_with=Password"`
@@ -41,15 +72,13 @@ func (b *BasicAuth) Validate() error {
 * Token
  */
 
-const TokenType = "token"
-
-type Token struct {
+type TokenAuth struct {
 	Token string `json:"token" yaml:"token" validate:"required"`
 }
 
-func (t *Token) AuthMethod() string { return TokenType }
+func (t *TokenAuth) AuthMethod() string { return TokenType }
 
-func (t *Token) Validate() error {
+func (t *TokenAuth) Validate() error {
 	// Validate token
 	if strings.TrimSpace(t.Token) == "" {
 		return errors.New("token cannot be empty")
