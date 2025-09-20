@@ -64,6 +64,11 @@ func (n *NATS) Stop() error {
 
 func (n *NATS) Publish(msg *message.Message) error {
 	// TODO: Add from where the message came
+	// TODO: IF connection is NIL, HANDLE IT
+
+	if n.conn == nil {
+		return fmt.Errorf("error")
+	}
 	return n.conn.Publish(msg.Topic, msg.Payload)
 }
 

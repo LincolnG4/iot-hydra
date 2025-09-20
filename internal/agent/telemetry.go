@@ -54,6 +54,10 @@ func NewTelemetryAgent(cfg *config.TelemetryAgentYAML) (*TelemetryAgent, error) 
 			return nil, fmt.Errorf("duplicate broker name: %s", name)
 		}
 
+		err = broker.Connect()
+		if err != nil {
+			return nil, fmt.Errorf("could not connect")
+		}
 		brokerMap[name] = broker
 	}
 
@@ -72,7 +76,8 @@ func (t *TelemetryAgent) RouteToBrokers(msg *message.Message) error {
 		b, exist := t.Brokers[brokerName]
 		if !exist {
 			// TODO: FIX < DONT STOP >
-			return fmt.Errorf("message not sent: broker %s is not configure", brokerName)
+			fmt.Printf("message not sent: broker %s is not configure", brokerName)
+			continue
 		}
 
 		err := b.Publish(msg)

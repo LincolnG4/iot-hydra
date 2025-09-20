@@ -1,7 +1,7 @@
 apiService:
   address: ":8080"
 telemetryAgent:
-  queueSize: 1000
+  queueSize: 1000000
   brokers:
     - name: ligmaMyNats
       type: nats

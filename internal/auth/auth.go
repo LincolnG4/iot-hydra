@@ -17,7 +17,7 @@ type Authenticator interface {
 }
 
 const (
-	BasicType = "basic"
+	BasicType = "plain"
 	TokenType = "token"
 )
 

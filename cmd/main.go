@@ -11,7 +11,7 @@ import (
 
 func main() {
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnixMs
-	logger := zerolog.New(os.Stdout).Level(zerolog.InfoLevel)
+	logger := zerolog.New(os.Stdout).Level(zerolog.DebugLevel)
 
 	log.Info().Msg("starting IoT runtime")
 

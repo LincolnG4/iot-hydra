@@ -11,7 +11,7 @@ type Message struct {
 	Payload []byte `json:"payload"`
 
 	// Slice of all brokers where the message will be fowarded
-	TargetBrokers []string `json:"target_brokers "`
+	TargetBrokers []string `json:"target_brokers"`
 	// Slice of from which broker the message came
 	SourceBroker string `json:"source_broker"`
 	Topic        string `json:"topic"`

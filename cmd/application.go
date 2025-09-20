@@ -53,7 +53,7 @@ func (a *application) mount() *gin.Engine {
 
 			// websocket message driven
 			iotAgent := v1.Group("/ws")
-			iotAgent.GET("/", a.websocketIoTHandler)
+			iotAgent.GET("", a.websocketIoTHandler)
 		}
 
 	}
@@ -66,7 +66,6 @@ func (a *application) startTelemetryAgent() error {
 	if err != nil {
 		return err
 	}
-
 	go func() {
 		for {
 			select {
@@ -83,6 +82,11 @@ func (a *application) startTelemetryAgent() error {
 }
 
 func (a *application) run(r *gin.Engine) error {
+	err := a.startTelemetryAgent()
+	if err != nil {
+		return err
+	}
+
 	srv := &http.Server{
 		Addr:         a.config.APIService.Address,
 		Handler:      r,
