@@ -72,18 +72,26 @@ func NewTelemetryAgent(cfg *config.TelemetryAgentYAML) (*TelemetryAgent, error) 
 }
 
 func (t *TelemetryAgent) RouteToBrokers(msg *message.Message) error {
+	var errors []error
+	
 	for _, brokerName := range msg.TargetBrokers {
 		b, exist := t.Brokers[brokerName]
 		if !exist {
-			// TODO: FIX < DONT STOP >
-			fmt.Printf("message not sent: broker %s is not configure", brokerName)
+			err := fmt.Errorf("broker '%s' is not configured", brokerName)
+			errors = append(errors, err)
 			continue
 		}
 
-		err := b.Publish(msg)
-		if err != nil {
-			return err
+		if err := b.Publish(msg); err != nil {
+			err = fmt.Errorf("failed to publish message to broker '%s': %w", brokerName, err)
+			errors = append(errors, err)
 		}
 	}
+	
+	if len(errors) > 0 {
+		return fmt.Errorf("failed to route message to %d broker(s): %v", len(errors), errors)
+	}
+	
 	return nil
 }
+

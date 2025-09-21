@@ -60,29 +60,34 @@ func (a *application) mount() *gin.Engine {
 	return router
 }
 
-func (a *application) startTelemetryAgent() error {
+func (a *application) startTelemetryAgent(ctx context.Context) error {
 	var err error
 	a.TelemetryAgent, err = agent.NewTelemetryAgent(&a.config.TelemetryAgent)
 	if err != nil {
 		return err
 	}
+	
+	a.ctx = ctx
 	go func() {
 		for {
 			select {
 			case msg := <-a.TelemetryAgent.Queue:
 				if err := a.TelemetryAgent.RouteToBrokers(msg); err != nil {
-					a.logger.Error().Err(err).Msg("")
+					a.logger.Error().Err(err).Str("message_id", msg.ID).Msg("failed to route message to brokers")
+				} else {
+					a.logger.Debug().Str("message_id", msg.ID).Msg("message routed successfully")
 				}
-			case <-a.ctx.Done():
+			case <-ctx.Done():
 				a.logger.Info().Msg("telemetry agent stopped")
+				return
 			}
 		}
 	}()
 	return nil
 }
 
-func (a *application) run(r *gin.Engine) error {
-	err := a.startTelemetryAgent()
+func (a *application) run(ctx context.Context, r *gin.Engine) error {
+	err := a.startTelemetryAgent(ctx)
 	if err != nil {
 		return err
 	}
@@ -95,9 +100,34 @@ func (a *application) run(r *gin.Engine) error {
 		IdleTimeout:  time.Minute,
 	}
 
-	a.ctx = context.Background()
-	a.logger.Info().Msg("start message reader")
+	a.ctx = ctx
+	a.logger.Info().Str("address", a.config.APIService.Address).Msg("starting server")
 
-	a.logger.Info().Msg("server has started at localhost:8080")
-	return srv.ListenAndServe()
+	// Start server in a goroutine
+	serverErr := make(chan error, 1)
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			serverErr <- err
+		}
+	}()
+
+	// Wait for shutdown signal
+	select {
+	case err := <-serverErr:
+		return err
+	case <-ctx.Done():
+		a.logger.Info().Msg("shutdown signal received, stopping server...")
+		
+		// Graceful shutdown with timeout
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			a.logger.Error().Err(err).Msg("server forced to shutdown")
+			return err
+		}
+		
+		a.logger.Info().Msg("server stopped gracefully")
+		return nil
+	}
 }
