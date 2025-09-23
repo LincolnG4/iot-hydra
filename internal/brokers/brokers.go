@@ -1,6 +1,7 @@
 package brokers
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -22,7 +23,7 @@ type Broker interface {
 	Stop() error
 
 	// Publish the message to the broker
-	Publish(*message.Message) error
+	Publish(context.Context, *message.Message) error
 
 	// Subscribe to broker and wait T seconds to receive the message, otherwise
 	// returns nil and timeout

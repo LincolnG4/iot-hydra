@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/signal"
 	"syscall"
@@ -10,6 +11,8 @@ import (
 	"github.com/LincolnG4/iot-hydra/internal/runtimer"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"go.opentelemetry.io/otel"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
 func main() {
@@ -39,22 +42,19 @@ func main() {
 
 	// OpenTelemetry setup
 	log.Debug().Msg("starting OpenTelemetry")
-	// Handle SIGINT (CTRL+C) gracefully.
-	// ctx, stop := signal.NotifyCo2ntext(context.Background(), os.Interrupt)
-	// defer stop()
 
-	// // Set up OpenTelemetry.
-	// otelShutdown, err := setupOTelSDK(ctx)
-	// if err != nil {
-	// 	log.Error().Err(err).Msg("")
-	// 	return
-	// }
-	// // Handle shutdown properly so nothing leaks.
-	// defer func() {
-	// 	err = errors.Join(err, otelShutdown(context.Background()))
-	// 	log.Error().Err(err).Msg("")
-	// }()
-	// otel.SetTracerProvider(sdktrace.NewTracerProvider(sdktrace.WithSampler(sdktrace.ParentBased(sdktrace.AlwaysSample()))))
+	// Set up OpenTelemetry.
+	otelShutdown, err := setupOTelSDK(ctx)
+	if err != nil {
+		log.Error().Err(err).Msg("")
+		return
+	}
+	// Handle shutdown properly so nothing leaks.
+	defer func() {
+		err = errors.Join(err, otelShutdown(context.Background()))
+		log.Error().Err(err).Msg("")
+	}()
+	otel.SetTracerProvider(sdktrace.NewTracerProvider(sdktrace.WithSampler(sdktrace.ParentBased(sdktrace.AlwaysSample()))))
 
 	log.Debug().Msg("starting PodmanRuntime")
 	socketPath := os.Getenv("PODMAN_SOCKET_PATH")
@@ -62,7 +62,7 @@ func main() {
 		socketPath = "unix:///run/podman/podman.sock" // default podman socket
 		log.Info().Str("socket_path", socketPath).Msg("using default Podman socket")
 	}
-	
+
 	podmanRuntime, err := runtimer.NewPodmanManager(
 		&runtimer.ManagerOptions{
 			SocketPath: socketPath,

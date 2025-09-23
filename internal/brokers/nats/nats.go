@@ -1,6 +1,7 @@
 package nats
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -62,19 +63,19 @@ func (n *NATS) Stop() error {
 	return nil
 }
 
-func (n *NATS) Publish(msg *message.Message) error {
+func (n *NATS) Publish(ctx context.Context, msg *message.Message) error {
 	if n.conn == nil {
 		return fmt.Errorf("NATS connection is not established for broker '%s'", n.Config.Name)
 	}
-	
+
 	if !n.isConnected {
 		return fmt.Errorf("NATS broker '%s' is not connected", n.Config.Name)
 	}
-	
+
 	if err := n.conn.Publish(msg.Topic, msg.Payload); err != nil {
 		return fmt.Errorf("failed to publish message to topic '%s' on broker '%s': %w", msg.Topic, n.Config.Name, err)
 	}
-	
+
 	return nil
 }
 
@@ -82,11 +83,11 @@ func (n *NATS) SubscribeAndWait(topic string, waitSecond time.Duration) (*messag
 	if n.conn == nil {
 		return nil, fmt.Errorf("NATS connection is not established for broker '%s'", n.Config.Name)
 	}
-	
+
 	if !n.isConnected {
 		return nil, fmt.Errorf("NATS broker '%s' is not connected", n.Config.Name)
 	}
-	
+
 	s, err := n.conn.SubscribeSync(topic)
 	if err != nil {
 		return nil, fmt.Errorf("failed to subscribe to topic '%s' on broker '%s': %w", topic, n.Config.Name, err)

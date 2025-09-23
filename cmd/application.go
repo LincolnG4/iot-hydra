@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -66,16 +67,28 @@ func (a *application) startTelemetryAgent(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	
+
+	// start workerpool
+	a.TelemetryAgent.WorkerPool.Start()
+
 	a.ctx = ctx
 	go func() {
 		for {
 			select {
 			case msg := <-a.TelemetryAgent.Queue:
-				if err := a.TelemetryAgent.RouteToBrokers(msg); err != nil {
-					a.logger.Error().Err(err).Str("message_id", msg.ID).Msg("failed to route message to brokers")
-				} else {
-					a.logger.Debug().Str("message_id", msg.ID).Msg("message routed successfully")
+				for _, brokerName := range msg.TargetBrokers {
+					b, exist := a.TelemetryAgent.Brokers[brokerName]
+					if !exist {
+						a.logger.Error().Msg(fmt.Sprintf("broker '%s' is not configured", brokerName))
+						continue
+					}
+
+					a.TelemetryAgent.WorkerPool.JobQueue <- func() error {
+						if err := b.Publish(ctx, msg); err != nil {
+							a.TelemetryAgent.WorkerPool.ResultQueue <- fmt.Errorf("failed to publish message to broker '%s': %w", brokerName, err)
+						}
+						return nil
+					}
 				}
 			case <-ctx.Done():
 				a.logger.Info().Msg("telemetry agent stopped")
@@ -117,16 +130,16 @@ func (a *application) run(ctx context.Context, r *gin.Engine) error {
 		return err
 	case <-ctx.Done():
 		a.logger.Info().Msg("shutdown signal received, stopping server...")
-		
+
 		// Graceful shutdown with timeout
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		
+
 		if err := srv.Shutdown(shutdownCtx); err != nil {
 			a.logger.Error().Err(err).Msg("server forced to shutdown")
 			return err
 		}
-		
+
 		a.logger.Info().Msg("server stopped gracefully")
 		return nil
 	}

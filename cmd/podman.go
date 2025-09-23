@@ -7,6 +7,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// TODO: ADD COMMENTS
+
 type newContainerPayload struct {
 	Name  string `json:"name" uri:"name"`
 	Image string `json:"image"`

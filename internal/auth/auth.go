@@ -50,6 +50,7 @@ func NewAuthenticator(cfg config.AuthYAML) (Authenticator, error) {
 * Plain Text
  */
 
+// BasicAuth implements a Username and Password authentication
 type BasicAuth struct {
 	Username string `json:"user" yaml:"user" validate:"required_with=Password"`
 	Password string `json:"password" yaml:"password" validate:"required_with=Username"`
@@ -72,6 +73,7 @@ func (b *BasicAuth) Validate() error {
 * Token
  */
 
+// TokenAuth implements a token only authentication
 type TokenAuth struct {
 	Token string `json:"token" yaml:"token" validate:"required"`
 }
