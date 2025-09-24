@@ -1,8 +1,9 @@
 package config
 
 type TelemetryAgentYAML struct {
-	QueueSize int          `yaml:"queueSize" validate:"gt=0"`
-	Brokers   []BrokerYAML `yaml:"brokers" validate:"required,min=1,dive"`
+	QueueSize  int          `yaml:"queueSize" validate:"gt=0"`
+	MaxWorkers int          `yaml:"maxWorkers" validate:"gt=0"`
+	Brokers    []BrokerYAML `yaml:"brokers" validate:"required,min=1,dive"`
 }
 
 type BrokerYAML struct {

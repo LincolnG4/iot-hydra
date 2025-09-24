@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -17,17 +16,12 @@ import (
 
 type application struct {
 	// responsible to manage podman service
-	PodmanRuntime runtimer.PodmanRuntime
-	logger        *zerolog.Logger
-
-	// configuration loaded from config.yaml file
-	config *config.ConfigYAML
-
-	ctx    context.Context
-	cancel *context.CancelFunc
-
-	// agent responsible to route telemetry messsages to the brokers
-	TelemetryAgent *agent.TelemetryAgent
+	PodmanRuntime  runtimer.PodmanRuntime
+	logger         *zerolog.Logger
+	config         *config.ConfigYAML // configuration loaded from config.yaml file
+	ctx            context.Context
+	cancel         *context.CancelFunc
+	TelemetryAgent *agent.TelemetryAgent // agent responsible to route telemetry messsages to the brokers
 }
 
 func (a *application) mount() *gin.Engine {
@@ -79,18 +73,21 @@ func (a *application) startTelemetryAgent(ctx context.Context) error {
 				for _, brokerName := range msg.TargetBrokers {
 					b, exist := a.TelemetryAgent.Brokers[brokerName]
 					if !exist {
-						a.logger.Error().Msg(fmt.Sprintf("broker '%s' is not configured", brokerName))
+						a.logger.Error().Str("broker", brokerName).Str("device_id", msg.DeviceID).Str("topic", msg.Topic).Str("message_id", msg.ID).Msg("broker not configured")
 						continue
 					}
 
-					a.TelemetryAgent.WorkerPool.JobQueue <- func() error {
-						if err := b.Publish(ctx, msg); err != nil {
-							a.TelemetryAgent.WorkerPool.ResultQueue <- fmt.Errorf("failed to publish message to broker '%s': %w", brokerName, err)
-						}
-						return nil
+					submitted := a.TelemetryAgent.WorkerPool.Submit(func() error {
+						a.logger.Debug().Str("broker", brokerName).Str("device_id", msg.DeviceID).Str("topic", msg.Topic).Str("message_id", msg.ID).Msg("publishing telemetry")
+						return b.Publish(ctx, msg)
+					})
+					if !submitted {
+						a.logger.Error().Str("broker", brokerName).Str("device_id", msg.DeviceID).Str("topic", msg.Topic).Str("message_id", msg.ID).Msg("failed to enqueue publish job")
 					}
 				}
 			case <-ctx.Done():
+				a.logger.Info().Msg("telemetry agent stopping")
+				a.TelemetryAgent.WorkerPool.Stop()
 				a.logger.Info().Msg("telemetry agent stopped")
 				return
 			}

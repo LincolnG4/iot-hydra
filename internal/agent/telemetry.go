@@ -59,22 +59,29 @@ func NewTelemetryAgent(cfg *config.TelemetryAgentYAML) (*TelemetryAgent, error) 
 
 		err = broker.Connect()
 		if err != nil {
-			return nil, fmt.Errorf("could not connect")
+			return nil, fmt.Errorf("could not connect to broker '%s': %w", name, err)
 		}
 		brokerMap[name] = broker
 	}
-
-	ctx := context.Background()
 
 	// The agent is assembled with the created brokers and a properly sized message queue.
 	agent := &TelemetryAgent{
 		Queue:      make(chan *message.Message, cfg.QueueSize),
 		Brokers:    brokerMap,
 		ctx:        context.Background(),
-		WorkerPool: workerpool.New(ctx, cfg.QueueSize, 3),
+		WorkerPool: workerpool.New(context.Background(), cfg.QueueSize, 3),
 	}
 
 	return agent, nil
+}
+
+func (t *TelemetryAgent) Submit(m *message.Message) bool {
+	select {
+	case t.Queue <- m:
+		return true
+	case <-t.ctx.Done():
+		return false
+	}
 }
 
 // func (t *TelemetryAgent) RouteToBrokers(msg *message.Message) error {

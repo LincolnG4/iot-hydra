@@ -39,11 +39,9 @@ func (a *application) websocketIoTHandler(c *gin.Context) {
 		msg.ID = fmt.Sprintf("ws-%d", time.Now().UnixNano())
 		msg.Timestamp = time.Now()
 
-		select {
-		case a.TelemetryAgent.Queue <- &msg:
-			a.logger.Debug().Msg("Message received via WebSocket: " + msg.ID)
-		default:
-			a.logger.Warn().Msg("Telemetry queue is full. Dropping message from client.")
+		submitted := a.TelemetryAgent.Submit(&msg)
+		if !submitted {
+			a.logger.Error().Str("message", msg.ID).Str("device_id", msg.DeviceID).Str("topic", msg.Topic).Msg("failed to enqueue publish job")
 		}
 
 		a.logger.Debug().Msg("Message received via WebSocket:" + msg.ID)

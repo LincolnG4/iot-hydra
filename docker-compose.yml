@@ -70,8 +70,7 @@ services:
     environment:
       - gf_security_admin_password=admin
     volumes:
-      - grafana-storage:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning
+      
     networks:
       - iot-net
 

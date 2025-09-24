@@ -12,7 +12,7 @@ type (
 type Workerpool struct {
 	ctx    context.Context
 	cancel context.CancelFunc
-	wg     sync.WaitGroup
+	wg     *sync.WaitGroup
 
 	// Number of workers in the pool
 	maxWorkers int
@@ -31,7 +31,7 @@ func New(ctx context.Context, queueSize int, maxWorkers int) *Workerpool {
 	return &Workerpool{
 		ctx:         ctx,
 		cancel:      cancel,
-		wg:          wg,
+		wg:          &wg,
 		JobQueue:    make(chan job, queueSize),
 		ResultQueue: make(chan error, queueSize),
 		maxWorkers:  maxWorkers,
@@ -55,7 +55,8 @@ func (w *Workerpool) worker(id int) {
 			if !ok {
 				return
 			}
-			w.ResultQueue <- job()
+			// TODO: treat errors
+			job()
 		case <-w.ctx.Done():
 			return
 		}
@@ -63,9 +64,22 @@ func (w *Workerpool) worker(id int) {
 }
 
 func (w *Workerpool) Stop() {
-	w.cancel()
-	w.wg.Wait()
-
+	// Signal that no more jobs will be submitted
 	close(w.JobQueue)
+	// Ensure any waiting workers are released
+	w.cancel()
+	// Wait for all workers to finish processing remaining jobs
+	w.wg.Wait()
+	// Close results after all workers have exited
 	close(w.ResultQueue)
+}
+
+// Submit enqueues a job for execution. It returns false if the pool is stopping.
+func (w *Workerpool) Submit(j job) bool {
+	select {
+	case w.JobQueue <- j:
+		return true
+	case <-w.ctx.Done():
+		return false
+	}
 }
