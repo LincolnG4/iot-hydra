@@ -77,7 +77,7 @@ func TestNATS_Publish(t *testing.T) {
 				isConnected: true,
 			}
 
-			err := n.Publish(&tt.msg)
+			err := n.Publish(context.Background(), &tt.msg)
 
 			if tt.expectedError {
 				assert.Error(t, err)
@@ -155,7 +155,7 @@ func TestNATS_Integration(t *testing.T) {
 			// Publish in background
 			go func() {
 				time.Sleep(1 * time.Second)
-				err := broker.Publish(&message.Message{Topic: "foo", Payload: []byte("Test")})
+				err := broker.Publish(context.Background(), &message.Message{Topic: "foo", Payload: []byte("Test")})
 				assert.NoError(t, err, "Could not publish to NATS")
 			}()
 

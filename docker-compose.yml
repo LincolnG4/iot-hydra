@@ -45,7 +45,7 @@ services:
       - /etc/alloy/config.alloy
       - --server.http.listen-addr=0.0.0.0:12345
     ports:
-      - '12345:12345'
+      - "12345:12345"
     networks:
       - iot-net
   prometheus:
@@ -56,12 +56,14 @@ services:
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
     command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
-      - '--storage.tsdb.retention.time=200h'
-      - '--web.enable-lifecycle'
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/etc/prometheus/console_libraries"
+      - "--web.console.templates=/etc/prometheus/consoles"
+      - "--storage.tsdb.retention.time=200h"
+      - "--web.enable-lifecycle"
+    networks:
+      - iot-net
   grafana:
     image: grafana/grafana:latest
     container_name: grafana
@@ -70,7 +72,8 @@ services:
     environment:
       - gf_security_admin_password=admin
     volumes:
-      
+      - grafana-storage:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
     networks:
       - iot-net
 
@@ -79,20 +82,20 @@ services:
     image: grafana/loki:latest
     restart: on-failure
     ports:
-      - '3100:3100'
+      - "3100:3100"
     networks:
       - iot-net
 
   tempo:
-    container_name: tempo 
+    container_name: tempo
     image: grafana/tempo:latest
     restart: on-failure
-    command: [ "-config.file=/etc/tempo.yaml" ]
+    command: ["-config.file=/etc/tempo.yaml"]
     volumes:
       - ./config/tempo/tempo.yaml:/etc/tempo.yaml
     ports:
-      - '3200:3200'
-      - '4317:4317'
+      - "3200:3200"
+      - "4317:4317"
     networks:
       - iot-net
   iot-runtime:
@@ -100,7 +103,7 @@ services:
     env_file: ".envrc"
     build:
       context: .
-      dockerfile: ./Dockerfile 
+      dockerfile: ./Dockerfile
     privileged: true
     networks:
       - iot-net
@@ -109,10 +112,9 @@ services:
     volumes:
       - .:/app
       - /run/user/1000/podman/podman.sock:/run/user/1000/podman/podman.sock:ro
-    environment: 
-    - PODMAN_SOCKET_PATH=/run/user/1000/podman/podman.sock
-
-
+    environment:
+      - PODMAN_SOCKET_PATH=unix:///run/user/1000/podman/podman.sock
+      - YAML_CONFIG_PATH="./config.yaml"
 volumes:
   grafana-storage:
   tempo-storage:

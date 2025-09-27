@@ -14,10 +14,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// TODO: REWRITE ALL
 func TestUnmarshalYAML_Success(t *testing.T) {
-	y := `telemetryAgent:
+	y := []byte(`
+telemetryAgent:
   queueSize: 1000
+  maxWorkers: 2
   brokers:
     - name: ligmaMyNats
       type: nats
@@ -30,17 +31,17 @@ func TestUnmarshalYAML_Success(t *testing.T) {
       type: nats
       address: "localhost:9999"
       auth:
-        method: natsToken
-        token: my-secret-token`
-
+        method: token
+        token: my-secret-token
+`)
 	var wrapper struct {
-		TelemetryAgent TelemetryAgent `yaml:"telemetryAgent"`
+		TelemetryAgent `yaml:"telemetryAgent"`
 	}
-	err := yaml.Unmarshal([]byte(y), &wrapper)
+	err := yaml.Unmarshal(y, &wrapper)
 	assert.NoError(t, err)
 
 	// check global properties
-	assert.Equal(t, 11, len(wrapper.TelemetryAgent.Queue), "Wrong queueSize")
+	assert.Equal(t, 1000, len(wrapper.TelemetryAgent.Queue), "Wrong queueSize")
 	assert.Len(t, wrapper.TelemetryAgent.Brokers, 2, "Expected to parse 2 brokers")
 
 	// Define test cases for each broker

@@ -7,13 +7,12 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// TODO: ADD COMMENTS
-
 type newContainerPayload struct {
 	Name  string `json:"name" uri:"name"`
 	Image string `json:"image"`
 }
 
+// createContaiener deploys new podman container from image.
 func (a *application) createContainer(c *gin.Context) {
 	var newContainer newContainerPayload
 
@@ -38,6 +37,7 @@ func (a *application) createContainer(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"status": "container created successfully", "container": container})
 }
 
+// checkContainer returns the current status of the container requested.
 func (a *application) checkContainer(c *gin.Context) {
 	var newContainer newContainerPayload
 	if err := c.ShouldBindUri(&newContainer); err != nil {
@@ -61,6 +61,7 @@ func (a *application) checkContainer(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "container checked successfully", "container": conInfo})
 }
 
+// startContainer starts the container based on it name.
 func (a *application) startContainer(c *gin.Context) {
 	var newContainer newContainerPayload
 	if err := c.ShouldBindUri(&newContainer); err != nil {
@@ -82,6 +83,7 @@ func (a *application) startContainer(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"response": "container started"})
 }
 
+// stopContainer stops the container based on it name.
 func (a *application) stopContainer(c *gin.Context) {
 	var newContainer newContainerPayload
 	if err := c.ShouldBindUri(&newContainer); err != nil {
@@ -103,6 +105,7 @@ func (a *application) stopContainer(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"response": "container stopped"})
 }
 
+// deleteContainer remove the container.
 func (a *application) deleteContainer(c *gin.Context) {
 	var newContainer newContainerPayload
 	if err := c.ShouldBindUri(&newContainer); err != nil {
@@ -124,6 +127,7 @@ func (a *application) deleteContainer(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"response": "container deleted"})
 }
 
+// listContainer lists all containers on the device.
 func (a *application) listContainer(c *gin.Context) {
 	containers, err := a.PodmanRuntime.ListContainers()
 	if err != nil {

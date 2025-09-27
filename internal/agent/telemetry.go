@@ -12,14 +12,9 @@ import (
 )
 
 type TelemetryAgent struct {
-	ctx context.Context
-
-	// Queue telemetry messages
-	Queue chan *message.Message
-
-	// Map of brokers connected
-	Brokers map[string]brokers.Broker
-
+	ctx        context.Context
+	Queue      chan *message.Message     // Queue telemetry messages
+	Brokers    map[string]brokers.Broker // Map of brokers connected
 	WorkerPool *workerpool.Workerpool
 }
 
@@ -32,7 +27,7 @@ func NewTelemetryAgent(cfg *config.TelemetryAgentYAML) (*TelemetryAgent, error) 
 	// The map of brokers is created to hold the initialized brokers.
 	brokerMap := make(map[string]brokers.Broker)
 
-	// loop through each broker configuration provided in the YAML file.
+	// Loop through each broker configuration provided in the YAML file.
 	for _, brokerCfg := range cfg.Brokers {
 		//  create the authenticator
 		authenticator, err := auth.NewAuthenticator(brokerCfg.Auth)
@@ -40,7 +35,7 @@ func NewTelemetryAgent(cfg *config.TelemetryAgentYAML) (*TelemetryAgent, error) 
 			return nil, fmt.Errorf("failed to create authenticator for broker '%s': %w", brokerCfg.Name, err)
 		}
 
-		// create the broker .
+		// Create the broker.
 		broker, err := brokers.NewBroker(brokers.Config{
 			Name:    brokerCfg.Name,
 			Type:    brokerCfg.Type,
@@ -51,7 +46,7 @@ func NewTelemetryAgent(cfg *config.TelemetryAgentYAML) (*TelemetryAgent, error) 
 			return nil, fmt.Errorf("failed to create broker '%s': %w", brokerCfg.Name, err)
 		}
 
-		// check for duplicate broker names to avoid conflicts.
+		// Check for duplicate broker names to avoid conflicts.
 		name := broker.Name()
 		if _, exist := brokerMap[name]; exist {
 			return nil, fmt.Errorf("duplicate broker name: %s", name)

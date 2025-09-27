@@ -15,15 +15,16 @@ import (
 )
 
 type application struct {
-	// responsible to manage podman service
-	PodmanRuntime  runtimer.PodmanRuntime
-	logger         *zerolog.Logger
-	config         *config.ConfigYAML // configuration loaded from config.yaml file
-	ctx            context.Context
-	cancel         *context.CancelFunc
-	TelemetryAgent *agent.TelemetryAgent // agent responsible to route telemetry messsages to the brokers
+	PodmanRuntime  runtimer.PodmanRuntime // responsible to manage podman service
+	config         *config.ConfigYAML     // configuration loaded from config.yaml file
+	TelemetryAgent *agent.TelemetryAgent  // agent responsible to route telemetry messsages to the brokers
+
+	logger *zerolog.Logger
+	ctx    context.Context
+	cancel *context.CancelFunc
 }
 
+// mount setup routes for mutex
 func (a *application) mount() *gin.Engine {
 	router := gin.Default()
 	gin.SetMode(gin.DebugMode)
@@ -33,22 +34,22 @@ func (a *application) mount() *gin.Engine {
 	{
 		v1 := router.Group("/v1")
 		{
+			// Podman Route
 			containers := v1.Group("/containers")
-			containers.POST("/", a.createContainer)
-			containers.GET("/", a.listContainer)
-
-			containers.GET("/:name", a.checkContainer)
-			containers.POST("/:name/start", a.startContainer)
-			containers.POST("/:name/stop", a.stopContainer)
-			containers.DELETE("/:name", a.deleteContainer)
+			containers.POST("/", a.createContainer)           // Create Container
+			containers.GET("/", a.listContainer)              // List all containers
+			containers.GET("/:name", a.checkContainer)        // Check status container
+			containers.POST("/:name/start", a.startContainer) // Start container
+			containers.POST("/:name/stop", a.stopContainer)   // Stop container
+			containers.DELETE("/:name", a.deleteContainer)    // Delete container
 
 			// health endpoint
 			health := v1.Group("/health")
-			health.GET("/", a.healthChecker)
+			health.GET("/", a.healthChecker) // Check Health
 
 			// websocket message driven
 			iotAgent := v1.Group("/ws")
-			iotAgent.GET("", a.websocketIoTHandler)
+			iotAgent.GET("", a.websocketIoTHandler) // Websocket message driven
 		}
 
 	}
@@ -88,7 +89,6 @@ func (a *application) startTelemetryAgent(ctx context.Context) error {
 			case <-ctx.Done():
 				a.logger.Info().Msg("telemetry agent stopping")
 				a.TelemetryAgent.WorkerPool.Stop()
-				a.logger.Info().Msg("telemetry agent stopped")
 				return
 			}
 		}
