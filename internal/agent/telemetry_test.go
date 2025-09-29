@@ -1,50 +1,77 @@
 package agent
 
 import (
-	"context"
+	"strings"
 	"testing"
-	"time"
 
-	"github.com/LincolnG4/iot-hydra/internal/auth"
-	"github.com/LincolnG4/iot-hydra/internal/brokers"
-	"github.com/LincolnG4/iot-hydra/internal/message"
-	"github.com/rs/zerolog/log"
+	"github.com/LincolnG4/iot-hydra/internal/brokers/nats"
+	"github.com/LincolnG4/iot-hydra/internal/config"
+	"github.com/alecthomas/assert"
 )
 
-// TODO: Create tests
-func TestSendMessage_Success(t *testing.T) {
-	cfg := brokers.Config{
-		Name:    "nats",
-		Type:    "nats",
-		Address: "localhost:4222",
-		Auth: &auth.BasicAuth{
-			Username: "test",
-			Password: "test",
-		},
-	}
-	b, _ := brokers.NewBroker(cfg)
-	ag := TelemetryAgent{
-		Queue: make(chan *message.Message, 1000),
-		Brokers: map[string]brokers.Broker{
-			"nats": b,
+func TestNewTelemetryAgent_Success(t *testing.T) {
+	cfg := &config.TelemetryAgentYAML{
+		QueueSize:  10,
+		MaxWorkers: 2,
+		Brokers: []config.BrokerYAML{
+			{
+				Name:    "deezeNats",
+				Type:    "nats",
+				Address: "localhost:4222",
+				Auth: config.AuthYAML{
+					Method:   "plain",
+					User:     "test",
+					Password: "pwd",
+				},
+			},
 		},
 	}
 
-	ag.WorkerPool.Start()
-	ctx, cancel := context.WithCancel(context.Background())
-	go func(context.CancelFunc) {
-		time.Sleep(10 * time.Second)
-		cancel()
-	}(cancel)
+	ag, err := NewTelemetryAgent(cfg)
+	assert.NoError(t, err, "Should not fail to create a New Telemetrt Agent")
 
-	for {
-		select {
-		case msg := <-ag.Queue:
-			if err := ag.Submit(msg); err {
-				log.Error().Msg("queue should not be full")
+	b, exist := ag.Brokers["deezeNats"].(*nats.NATS)
+	assert.True(t, exist, "Broker should exist")
+
+	assert.Equal(t, cfg.Brokers[0].Name, b.Name())
+	assert.Equal(t, cfg.Brokers[0].Type, b.Type())
+	assert.Equal(t, cfg.Brokers[0].Type, b.Type())
+}
+
+func TestNewTelemetryAgent_Fail(t *testing.T) {
+	tests := []struct {
+		name          string
+		input         config.TelemetryAgentYAML
+		expectedError string
+	}{
+		{
+			"Bad broker config",
+			config.TelemetryAgentYAML{
+				QueueSize:  10,
+				MaxWorkers: 2,
+				Brokers: []config.BrokerYAML{
+					{
+						Name:    "deezeNats",
+						Type:    "wrongType",
+						Address: "localhost:4222",
+						Auth: config.AuthYAML{
+							Method:   "plain",
+							User:     "test",
+							Password: "pwd",
+						},
+					},
+				},
+			},
+			"failed to create broker",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := NewTelemetryAgent(&tt.input)
+			if strings.Contains(err.Error(), tt.expectedError) {
+				t.Errorf("expected `%s`, got `%s`", tt.expectedError, err.Error())
 			}
-		case <-ctx.Done():
-			log.Error().Msg("terminated")
-		}
+		})
 	}
 }

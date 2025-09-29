@@ -4,7 +4,7 @@ telemetryAgent:
   queueSize: 11
   maxWorkers: 2
   brokers:
-    - name: ligmaMyNats
+    - name: ligmaNats
       type: nats
       address: "nats_main:4222"
       auth:
