@@ -56,46 +56,6 @@ func (a *application) mount() *gin.Engine {
 	return router
 }
 
-func (a *application) startTelemetryAgent(ctx context.Context) error {
-	var err error
-	a.TelemetryAgent, err = agent.NewTelemetryAgent(&a.config.TelemetryAgent)
-	if err != nil {
-		return err
-	}
-
-	// start workerpool
-	a.TelemetryAgent.WorkerPool.Start()
-
-	a.ctx = ctx
-	go func() {
-		for {
-			select {
-			case msg := <-a.TelemetryAgent.Queue:
-				for _, brokerName := range msg.TargetBrokers {
-					b, exist := a.TelemetryAgent.Brokers[brokerName]
-					if !exist {
-						a.logger.Error().Str("broker", brokerName).Str("device_id", msg.DeviceID).Str("topic", msg.Topic).Str("message_id", msg.ID).Msg("broker not configured")
-						continue
-					}
-
-					submitted := a.TelemetryAgent.WorkerPool.Submit(func() error {
-						a.logger.Debug().Str("broker", brokerName).Str("device_id", msg.DeviceID).Str("topic", msg.Topic).Str("message_id", msg.ID).Msg("publishing telemetry")
-						return b.Publish(ctx, msg)
-					})
-					if !submitted {
-						a.logger.Error().Str("broker", brokerName).Str("device_id", msg.DeviceID).Str("topic", msg.Topic).Str("message_id", msg.ID).Msg("failed to enqueue publish job")
-					}
-				}
-			case <-ctx.Done():
-				a.logger.Info().Msg("telemetry agent stopping")
-				a.TelemetryAgent.WorkerPool.Stop()
-				return
-			}
-		}
-	}()
-	return nil
-}
-
 func (a *application) run(ctx context.Context, r *gin.Engine) error {
 	err := a.startTelemetryAgent(ctx)
 	if err != nil {

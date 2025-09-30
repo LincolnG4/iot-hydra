@@ -14,12 +14,9 @@ type Workerpool struct {
 	cancel context.CancelFunc
 	wg     *sync.WaitGroup
 
-	// Number of workers in the pool
-	maxWorkers int
-	// Receives the worker's jobs
-	JobQueue chan job
-	// Output of the workers
-	ResultQueue chan error
+	maxWorkers  int        // Number of workers in the pool
+	JobQueue    chan job   // Receives the worker's jobs
+	ResultQueue chan error // Output of the workers
 }
 
 // New workerpool, where size of queue of jobs need to be defined
@@ -55,8 +52,7 @@ func (w *Workerpool) worker(id int) {
 			if !ok {
 				return
 			}
-			// TODO: treat errors
-			job()
+			w.ResultQueue <- job()
 		case <-w.ctx.Done():
 			return
 		}
