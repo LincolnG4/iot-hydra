@@ -2,6 +2,7 @@ package workerpool
 
 import (
 	"context"
+	"fmt"
 	"sync"
 )
 
@@ -9,14 +10,19 @@ type (
 	job func() error
 )
 
+type FailedResult struct {
+	WorkerID int
+	Error    error
+}
+
 type Workerpool struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 	wg     *sync.WaitGroup
 
-	maxWorkers  int        // Number of workers in the pool
-	JobQueue    chan job   // Receives the worker's jobs
-	ResultQueue chan error // Output of the workers
+	maxWorkers  int               // Number of workers in the pool
+	JobQueue    chan job          // Receives the worker's jobs
+	ResultQueue chan FailedResult // Output of the workers
 }
 
 // New workerpool, where size of queue of jobs need to be defined
@@ -30,7 +36,7 @@ func New(ctx context.Context, queueSize int, maxWorkers int) *Workerpool {
 		cancel:      cancel,
 		wg:          &wg,
 		JobQueue:    make(chan job, queueSize),
-		ResultQueue: make(chan error, queueSize),
+		ResultQueue: make(chan FailedResult, queueSize),
 		maxWorkers:  maxWorkers,
 	}
 }
@@ -52,7 +58,14 @@ func (w *Workerpool) worker(id int) {
 			if !ok {
 				return
 			}
-			w.ResultQueue <- job()
+			err := job()
+			if err != nil {
+				res := FailedResult{
+					WorkerID: id,
+					Error:    fmt.Errorf("worker: %w", err),
+				}
+				w.ResultQueue <- res
+			}
 		case <-w.ctx.Done():
 			return
 		}

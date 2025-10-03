@@ -18,15 +18,17 @@ func (a *application) startTelemetryAgent(ctx context.Context) error {
 	a.TelemetryAgent.WorkerPool.Start()
 
 	a.ctx = ctx
+	// go func to read the Telemetry Messages and route to brokers.
 	go func() {
 		for {
 			select {
 			case msg := <-a.TelemetryAgent.Queue: // Read messsages from the Channel
-				// TODO: Better handling of the errors
 				err := a.RouteMessage(ctx, msg)
 				if err != nil {
-					return err
+					a.logger.Error().Err(err).Str("message_id", msg.ID)
 				}
+			case failedResult := <-a.TelemetryAgent.WorkerPool.ResultQueue: // Log worker error
+				a.logger.Error().Err(failedResult.Error)
 			case <-ctx.Done(): // Context Canceled, finalizing Channel
 				a.logger.Info().Msg("telemetry agent stopping")
 				a.TelemetryAgent.WorkerPool.Stop()
