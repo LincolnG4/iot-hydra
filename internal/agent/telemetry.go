@@ -9,27 +9,52 @@ import (
 	"github.com/LincolnG4/iot-hydra/internal/config"
 	"github.com/LincolnG4/iot-hydra/internal/message"
 	"github.com/LincolnG4/iot-hydra/internal/workerpool"
+	"github.com/rs/zerolog"
 )
 
 type TelemetryAgent struct {
 	ctx        context.Context
+	Cancel     context.CancelFunc
+	logger     *zerolog.Logger
 	Queue      chan *message.Message     // Queue telemetry messages
 	Brokers    map[string]brokers.Broker // Map of brokers connected
 	WorkerPool *workerpool.Workerpool
 }
 
 // NewTelemetryAgent creates and configures a new TelemetryAgent.
-func NewTelemetryAgent(cfg *config.TelemetryAgentYAML) (*TelemetryAgent, error) {
+func NewTelemetryAgent(ctx context.Context, cfg *config.TelemetryAgentYAML, logger *zerolog.Logger) (*TelemetryAgent, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("configuration cannot be nil")
 	}
 
+	// Startup all brokers
+	brokerMap, err := setupBrokers(cfg.Brokers)
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, cancel := context.WithCancel(ctx)
+
+	// The agent is assembled with the created brokers and a properly sized message queue.
+	agent := &TelemetryAgent{
+		Queue:      make(chan *message.Message, cfg.QueueSize),
+		Brokers:    brokerMap,
+		ctx:        ctx,
+		Cancel:     cancel,
+		WorkerPool: workerpool.New(ctx, cfg.QueueSize, 3), // TODO: Setup number of workers by config
+	}
+
+	return agent, nil
+}
+
+// setupBrokers iterates through all broker from yaml, startup and returns a map[string]Broker that points to each broker configured
+func setupBrokers(config []config.BrokerYAML) (map[string]brokers.Broker, error) {
 	// The map of brokers is created to hold the initialized brokers.
 	brokerMap := make(map[string]brokers.Broker)
 
 	// Loop through each broker configuration provided in the YAML file.
-	for _, brokerCfg := range cfg.Brokers {
-		//  create the authenticator
+	for _, brokerCfg := range config {
+		//  Create the authenticator
 		authenticator, err := auth.NewAuthenticator(brokerCfg.Auth)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create authenticator for broker '%s': %w", brokerCfg.Name, err)
@@ -58,16 +83,57 @@ func NewTelemetryAgent(cfg *config.TelemetryAgentYAML) (*TelemetryAgent, error) 
 		}
 		brokerMap[name] = broker
 	}
+	return brokerMap, nil
+}
 
-	// The agent is assembled with the created brokers and a properly sized message queue.
-	agent := &TelemetryAgent{
-		Queue:      make(chan *message.Message, cfg.QueueSize),
-		Brokers:    brokerMap,
-		ctx:        context.Background(),
-		WorkerPool: workerpool.New(context.Background(), cfg.QueueSize, 3),
+func (t *TelemetryAgent) StartWorkerPool() {
+	t.WorkerPool.Start()
+}
+
+// Start initiate a go routine that will receive message from the Queue. The function only if context is cancel
+func (t *TelemetryAgent) Start() {
+	go func() {
+		for {
+			select {
+			case msg := <-t.Queue: // Read messsages from the Channel
+				err := t.RouteMessage(msg)
+				if err != nil {
+					t.logger.Error().Err(err).Str("message_id", msg.ID)
+				}
+			case failedResult := <-t.WorkerPool.ResultQueue: // Log worker error
+				t.logger.Error().Err(failedResult.Error)
+			case <-t.ctx.Done(): // Context Canceled, finalizing Channel
+				t.logger.Info().Msg("telemetry agent stopping")
+				t.WorkerPool.Stop()
+				return
+			}
+		}
+	}()
+}
+
+// RouteMessage distribute the message over all brokers.
+func (t *TelemetryAgent) RouteMessage(msg *message.Message) error {
+	// Distribute message for the routers
+	for _, brokerName := range msg.TargetBrokers {
+		// Check if router exist
+		b, exist := t.Brokers[brokerName]
+		if !exist {
+			t.logger.Error().Str("broker", brokerName).Str("device_id", msg.DeviceID).Str("topic", msg.Topic).Str("message_id", msg.ID).Msg("broker not configured")
+			continue
+		}
+
+		// Submit messsage to the router
+		submitted := t.WorkerPool.Submit(func() error {
+			t.logger.Debug().Str("broker", brokerName).Str("device_id", msg.DeviceID).Str("topic", msg.Topic).Str("message_id", msg.ID).Msg("publishing telemetry")
+			return b.Publish(t.ctx, msg)
+		})
+
+		// Check if the channel is not closed
+		if !submitted {
+			t.logger.Error().Str("broker", brokerName).Str("device_id", msg.DeviceID).Str("topic", msg.Topic).Str("message_id", msg.ID).Msg("failed to enqueue publish job")
+		}
 	}
-
-	return agent, nil
+	return nil
 }
 
 func (t *TelemetryAgent) Submit(m *message.Message) bool {

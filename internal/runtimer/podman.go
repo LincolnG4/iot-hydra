@@ -11,6 +11,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// PodmanRuntime defines the methods required by the HTTP layer.
 type PodmanRuntime interface {
 	CreateContainer(container Container) error
 	CheckContainer(name string) (Container, error)

@@ -5,8 +5,6 @@ import (
 	"net/http"
 	"time"
 
-	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
-
 	"github.com/LincolnG4/iot-hydra/internal/agent"
 	"github.com/LincolnG4/iot-hydra/internal/config"
 	"github.com/LincolnG4/iot-hydra/internal/runtimer"
@@ -24,39 +22,8 @@ type application struct {
 	cancel *context.CancelFunc
 }
 
-// mount setup routes for mutex
-func (a *application) mount() *gin.Engine {
-	router := gin.Default()
-	gin.SetMode(gin.DebugMode)
-	gin.DisableConsoleColor()
-	// Add the otelgin middleware
-	router.Use(otelgin.Middleware("iot-hydra-runtime"))
-	{
-		v1 := router.Group("/v1")
-		{
-			// Podman Route
-			containers := v1.Group("/containers")
-			containers.POST("/", a.createContainer)           // Create Container
-			containers.GET("/", a.listContainer)              // List all containers
-			containers.GET("/:name", a.checkContainer)        // Check status container
-			containers.POST("/:name/start", a.startContainer) // Start container
-			containers.POST("/:name/stop", a.stopContainer)   // Stop container
-			containers.DELETE("/:name", a.deleteContainer)    // Delete container
-
-			// health endpoint
-			health := v1.Group("/health")
-			health.GET("/", a.healthChecker) // Check Health
-
-			// websocket message driven
-			iotAgent := v1.Group("/ws")
-			iotAgent.GET("", a.websocketIoTHandler) // Websocket message driven
-		}
-
-	}
-	return router
-}
-
 func (a *application) run(ctx context.Context, r *gin.Engine) error {
+	// Start agent to collect data and send to brokers
 	err := a.startTelemetryAgent(ctx)
 	if err != nil {
 		return err
@@ -97,7 +64,6 @@ func (a *application) run(ctx context.Context, r *gin.Engine) error {
 			return err
 		}
 
-		a.logger.Info().Msg("server stopped gracefully")
 		return nil
 	}
 }

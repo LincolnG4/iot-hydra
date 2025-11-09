@@ -16,23 +16,23 @@ import (
 )
 
 func main() {
+	// Starting logs
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnixMs
 	logger := zerolog.New(os.Stdout).Level(zerolog.DebugLevel)
 
 	log.Info().Msg("starting IoT runtime")
-
 	// Handle SIGINT (CTRL+C) and SIGTERM gracefully
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	// load configuration file
+	// Load configuration file
 	configFile := os.Getenv("CONFIG_PATH")
 	if configFile == "" {
 		configFile = "config.yaml" // default config file
 		log.Info().Str("config_file", configFile).Msg("using default config file")
 	}
 
-	// create service configuration structure
+	// Create service configuration structure
 	log.Debug().Str("config_file", configFile).Msg("loading configuration")
 	cfg, err := config.NewConfigFromYAML(configFile)
 	if err != nil {
@@ -42,8 +42,6 @@ func main() {
 
 	// OpenTelemetry setup
 	log.Debug().Msg("starting OpenTelemetry")
-
-	// Set up OpenTelemetry.
 	otelShutdown, err := setupOTelSDK(ctx)
 	if err != nil {
 		log.Error().Err(err).Msg("")
@@ -63,6 +61,7 @@ func main() {
 		log.Info().Str("socket_path", socketPath).Msg("using default Podman socket")
 	}
 
+	// Starting podman runtimer
 	podmanRuntime, err := runtimer.NewPodmanManager(
 		&runtimer.ManagerOptions{
 			SocketPath: socketPath,
@@ -79,8 +78,7 @@ func main() {
 		config:        &cfg,
 	}
 
-	mux := app.mount()
-
+	mux := app.routes()
 	if err := app.run(ctx, mux); err != nil {
 		log.Error().Err(err).Msg("application failed")
 		os.Exit(1)
