@@ -11,7 +11,7 @@ func (a *application) startTelemetryAgent(ctx context.Context) error {
 	var err error
 
 	// Create the agent that will handle messages
-	logger := a.logger.With().Str("component", "telemtry agent").Logger()
+	logger := a.logger.With().Str("service", "telemetry agent").Logger()
 	agent, err := ag.NewTelemetryAgent(ctx, &a.config.TelemetryAgent, &logger)
 	if err != nil {
 		return err

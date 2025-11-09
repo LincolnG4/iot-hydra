@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"sync"
+
+	"github.com/rs/zerolog"
 )
 
 type (
@@ -16,10 +18,10 @@ type FailedResult struct {
 }
 
 type Workerpool struct {
-	ctx    context.Context
-	cancel context.CancelFunc
-	wg     *sync.WaitGroup
-
+	ctx         context.Context
+	cancel      context.CancelFunc
+	wg          *sync.WaitGroup
+	logger      *zerolog.Logger
 	maxWorkers  int               // Number of workers in the pool
 	JobQueue    chan job          // Receives the worker's jobs
 	ResultQueue chan FailedResult // Output of the workers
@@ -27,14 +29,16 @@ type Workerpool struct {
 
 // New workerpool, where size of queue of jobs need to be defined
 // and the maximum number of workers.
-func New(ctx context.Context, queueSize int, maxWorkers int) *Workerpool {
+func New(ctx context.Context, queueSize int, maxWorkers int, parentLogger *zerolog.Logger) *Workerpool {
 	ctx, cancel := context.WithCancel(ctx)
+	logger := parentLogger.With().Str("component", "workerpool").Logger()
 
 	var wg sync.WaitGroup
 	return &Workerpool{
 		ctx:         ctx,
 		cancel:      cancel,
 		wg:          &wg,
+		logger:      &logger,
 		JobQueue:    make(chan job, queueSize),
 		ResultQueue: make(chan FailedResult, queueSize),
 		maxWorkers:  maxWorkers,
@@ -43,6 +47,7 @@ func New(ctx context.Context, queueSize int, maxWorkers int) *Workerpool {
 
 // Start spawns workers into the pools.
 func (w *Workerpool) Start() {
+	w.logger.Info().Msg(fmt.Sprintf("starting %d workers.", w.maxWorkers))
 	// spawn workers
 	for i := range w.maxWorkers {
 		w.wg.Add(1)
@@ -51,6 +56,7 @@ func (w *Workerpool) Start() {
 }
 
 func (w *Workerpool) worker(id int) {
+	w.logger.Debug().Str("component", "worker").Int("worker ID", id).Msg("worker started.")
 	defer w.wg.Done()
 	for {
 		select {
@@ -67,12 +73,14 @@ func (w *Workerpool) worker(id int) {
 				w.ResultQueue <- res
 			}
 		case <-w.ctx.Done():
+			w.logger.Info().Msg("workerpool context done")
 			return
 		}
 	}
 }
 
 func (w *Workerpool) Stop() {
+	w.logger.Info().Msg("stopping workerpool")
 	// Signal that no more jobs will be submitted
 	close(w.JobQueue)
 	// Ensure any waiting workers are released
@@ -81,6 +89,7 @@ func (w *Workerpool) Stop() {
 	w.wg.Wait()
 	// Close results after all workers have exited
 	close(w.ResultQueue)
+	w.logger.Info().Msg("workerpool stopped")
 }
 
 // Submit enqueues a job for execution. It returns false if the pool is stopping.

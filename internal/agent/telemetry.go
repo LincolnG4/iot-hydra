@@ -41,7 +41,8 @@ func NewTelemetryAgent(ctx context.Context, cfg *config.TelemetryAgentYAML, logg
 		Brokers:    brokerMap,
 		ctx:        ctx,
 		Cancel:     cancel,
-		WorkerPool: workerpool.New(ctx, cfg.QueueSize, cfg.MaxWorkers),
+		WorkerPool: workerpool.New(ctx, cfg.QueueSize, cfg.MaxWorkers, logger),
+		logger:     logger,
 	}
 
 	return agent, nil
@@ -144,27 +145,3 @@ func (t *TelemetryAgent) Submit(m *message.Message) bool {
 		return false
 	}
 }
-
-// func (t *TelemetryAgent) RouteToBrokers(msg *message.Message) error {
-// 	var errors []error
-//
-// 	for _, brokerName := range msg.TargetBrokers {
-// 		b, exist := t.Brokers[brokerName]
-// 		if !exist {
-// 			err := fmt.Errorf("broker '%s' is not configured", brokerName)
-// 			errors = append(errors, err)
-// 			continue
-// 		}
-//
-// 		if err := b.Publish(msg); err != nil {
-// 			err = fmt.Errorf("failed to publish message to broker '%s': %w", brokerName, err)
-// 			errors = append(errors, err)
-// 		}
-// 	}
-//
-// 	if len(errors) > 0 {
-// 		return fmt.Errorf("failed to route message to %d broker(s): %v", len(errors), errors)
-// 	}
-//
-// 	return nil
-// }
