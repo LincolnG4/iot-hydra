@@ -26,7 +26,7 @@ func newTestRouter(m *runtimer.MockPodmanManager) *gin.Engine {
 			},
 		},
 	}
-	return app.mount()
+	return app.routes()
 }
 
 func TestCreateContainer_Success(t *testing.T) {
@@ -63,7 +63,7 @@ func TestCheckContainer_Success(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/v1/containers/alpha", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
-	assert.Equal(t, http.StatusCreated, w.Code)
+	assert.Equal(t, http.StatusOK, w.Code)
 }
 
 func TestStartStopDelete_Success(t *testing.T) {
@@ -99,5 +99,5 @@ func TestListContainers_Success(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/v1/containers/", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
-	assert.Equal(t, http.StatusCreated, w.Code)
+	assert.Equal(t, http.StatusOK, w.Code)
 }

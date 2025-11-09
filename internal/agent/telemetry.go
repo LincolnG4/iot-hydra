@@ -41,7 +41,7 @@ func NewTelemetryAgent(ctx context.Context, cfg *config.TelemetryAgentYAML, logg
 		Brokers:    brokerMap,
 		ctx:        ctx,
 		Cancel:     cancel,
-		WorkerPool: workerpool.New(ctx, cfg.QueueSize, 3), // TODO: Setup number of workers by config
+		WorkerPool: workerpool.New(ctx, cfg.QueueSize, cfg.MaxWorkers),
 	}
 
 	return agent, nil
