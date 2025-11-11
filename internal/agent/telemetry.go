@@ -33,15 +33,19 @@ func NewTelemetryAgent(ctx context.Context, cfg *config.TelemetryAgentYAML, logg
 		return nil, err
 	}
 
-	ctx, cancel := context.WithCancel(ctx)
+	wp, err := workerpool.New(ctx, cfg.QueueSize, cfg.MaxWorkers, logger)
+	if err != nil {
+		return nil, err
+	}
 
+	ctx, cancel := context.WithCancel(ctx)
 	// The agent is assembled with the created brokers and a properly sized message queue.
 	agent := &TelemetryAgent{
 		Queue:      make(chan *message.Message, cfg.QueueSize),
 		Brokers:    brokerMap,
 		ctx:        ctx,
 		Cancel:     cancel,
-		WorkerPool: workerpool.New(ctx, cfg.QueueSize, cfg.MaxWorkers, logger),
+		WorkerPool: wp,
 		logger:     logger,
 	}
 
@@ -124,10 +128,12 @@ func (t *TelemetryAgent) RouteMessage(msg *message.Message) error {
 		}
 
 		// Submit messsage to the router
-		submitted := t.WorkerPool.Submit(func() error {
-			t.logger.Debug().Str("broker", brokerName).Str("device_id", msg.DeviceID).Str("topic", msg.Topic).Str("message_id", msg.ID).Msg("publishing telemetry")
-			return b.Publish(t.ctx, msg)
-		})
+		submitted := t.WorkerPool.Submit(
+			func() error {
+				t.logger.Debug().Str("broker", brokerName).Str("device_id", msg.DeviceID).Str("topic", msg.Topic).Str("message_id", msg.ID).Msg("publishing telemetry")
+				return b.Publish(t.ctx, msg)
+			},
+		)
 
 		// Check if the channel is not closed
 		if !submitted {
@@ -137,6 +143,8 @@ func (t *TelemetryAgent) RouteMessage(msg *message.Message) error {
 	return nil
 }
 
+// Submit tries to send message to the Queue, if successed it returns True,
+// otherwise it will return false meaning that queue is full.
 func (t *TelemetryAgent) Submit(m *message.Message) bool {
 	select {
 	case t.Queue <- m:

@@ -2,6 +2,7 @@ package workerpool
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -9,7 +10,7 @@ import (
 )
 
 type (
-	job func() error
+	Job func() error
 )
 
 type FailedResult struct {
@@ -23,26 +24,41 @@ type Workerpool struct {
 	wg          *sync.WaitGroup
 	logger      *zerolog.Logger
 	maxWorkers  int               // Number of workers in the pool
-	JobQueue    chan job          // Receives the worker's jobs
+	JobQueue    chan Job          // Receives the worker's jobs
 	ResultQueue chan FailedResult // Output of the workers
 }
 
 // New workerpool, where size of queue of jobs need to be defined
-// and the maximum number of workers.
-func New(ctx context.Context, queueSize int, maxWorkers int, parentLogger *zerolog.Logger) *Workerpool {
-	ctx, cancel := context.WithCancel(ctx)
+// and the maximum number of workers. A error queue is set with same size of queue.
+// if queueSize be zero, it will be no buffered channel, if it be < zero, it will set as 1
+// It maxWorkers need to be > 0, otherwise it will be set as 1.
+func New(ctx context.Context, queueSize int, maxWorkers int, parentLogger *zerolog.Logger) (*Workerpool, error) {
+	if parentLogger == nil {
+		return nil, errors.New("logger can't be new")
+	}
 	logger := parentLogger.With().Str("component", "workerpool").Logger()
 
+	if maxWorkers <= 0 {
+		maxWorkers = 1
+		logger.Warn().Msg("max workers can't be less or equal zero. Set to 1")
+	}
+
+	if queueSize < 0 {
+		queueSize = 1
+		logger.Warn().Msg("queue size can't be less than zero. Set to 1")
+	}
+
+	ctx, cancel := context.WithCancel(ctx)
 	var wg sync.WaitGroup
 	return &Workerpool{
 		ctx:         ctx,
 		cancel:      cancel,
 		wg:          &wg,
 		logger:      &logger,
-		JobQueue:    make(chan job, queueSize),
+		JobQueue:    make(chan Job, queueSize),
 		ResultQueue: make(chan FailedResult, queueSize),
 		maxWorkers:  maxWorkers,
-	}
+	}, nil
 }
 
 // Start spawns workers into the pools.
@@ -93,7 +109,7 @@ func (w *Workerpool) Stop() {
 }
 
 // Submit enqueues a job for execution. It returns false if the pool is stopping.
-func (w *Workerpool) Submit(j job) bool {
+func (w *Workerpool) Submit(j Job) bool {
 	select {
 	case w.JobQueue <- j:
 		return true

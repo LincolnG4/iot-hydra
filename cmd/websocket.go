@@ -14,6 +14,8 @@ var wsupgrader = websocket.Upgrader{
 	WriteBufferSize: 1024,
 }
 
+// websocketIoTHandler is handler to establish connection with external pods.
+// It receives messages and foward to the TelemetryAgent
 func (a *application) websocketIoTHandler(c *gin.Context) {
 	conn, err := wsupgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
