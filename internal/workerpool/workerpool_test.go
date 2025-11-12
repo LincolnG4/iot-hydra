@@ -2,8 +2,11 @@ package workerpool
 
 import (
 	"context"
+	"fmt"
 	"os"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/alecthomas/assert"
 	"github.com/rs/zerolog"
@@ -36,17 +39,38 @@ func TestNewWorkerPool(t *testing.T) {
 		wp.Start()
 		defer wp.Stop()
 	})
-	// t.Run("Submit: sucessed", func(t *testing.T) {
-	// 	wp, _ := New(context.Background(), 1, 1, &logger)
-	// 	wp.Start()
-	// 	defer wp.Stop()
-	//
-	// 	job := func() error { return nil }
-	// 	wp.Submit(job)
-	// })
-	// t.Run("Submit: failed", func(t *testing.T) {
-	// 	wp, _ := New(context.Background(), 1, 1, &logger)
-	// 	wp.Start()
-	// 	defer wp.Stop()
-	// })
+	// TODO: catch results
+	t.Run("Submit: sucessed", func(t *testing.T) {
+		wp, _ := New(context.Background(), 1, 1, &logger)
+		wp.Start()
+		defer wp.Stop()
+
+		job := func() error { return nil }
+		wp.Submit(job)
+	})
+	t.Run("Submit: failed", func(t *testing.T) {
+		wp, _ := New(context.Background(), 1, 1, &logger)
+		wp.Start()
+		defer wp.Stop()
+
+		job := func() error {
+			time.Sleep(1 * time.Second)
+			return nil
+		}
+
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			err := wp.Submit(job)
+			print(err)
+		}()
+
+		r2 := wp.Submit(job)
+		fmt.Println(r2) // Should be false if queue is full
+
+		wg.Wait() // Wait for goroutine before Stop() is called
+	})
 }
+
+// TODO: Test, submit before start ?

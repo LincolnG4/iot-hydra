@@ -128,16 +128,14 @@ func (t *TelemetryAgent) RouteMessage(msg *message.Message) error {
 		}
 
 		// Submit messsage to the router
-		submitted := t.WorkerPool.Submit(
+		err := t.WorkerPool.Submit(
 			func() error {
 				t.logger.Debug().Str("broker", brokerName).Str("device_id", msg.DeviceID).Str("topic", msg.Topic).Str("message_id", msg.ID).Msg("publishing telemetry")
 				return b.Publish(t.ctx, msg)
 			},
 		)
-
-		// Check if the channel is not closed
-		if !submitted {
-			t.logger.Error().Str("broker", brokerName).Str("device_id", msg.DeviceID).Str("topic", msg.Topic).Str("message_id", msg.ID).Msg("failed to enqueue publish job")
+		if err != nil {
+			t.logger.Error().Err(err).Str("broker", brokerName).Str("device_id", msg.DeviceID).Str("topic", msg.Topic).Str("message_id", msg.ID).Msg("failed to enqueue publish job")
 		}
 	}
 	return nil

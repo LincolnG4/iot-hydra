@@ -77,6 +77,8 @@ func (w *Workerpool) worker(id int) {
 	for {
 		select {
 		case job, ok := <-w.JobQueue:
+			w.logger.Info().Msg("Starting job")
+
 			if !ok {
 				return
 			}
@@ -88,8 +90,10 @@ func (w *Workerpool) worker(id int) {
 				}
 				w.ResultQueue <- res
 			}
+
+			w.logger.Info().Msg("finish")
 		case <-w.ctx.Done():
-			w.logger.Info().Msg("workerpool context done")
+			w.logger.Info().Msg("workerpool context done. worker stopped.")
 			return
 		}
 	}
@@ -97,23 +101,29 @@ func (w *Workerpool) worker(id int) {
 
 func (w *Workerpool) Stop() {
 	w.logger.Info().Msg("stopping workerpool")
+
+	w.cancel()
+
 	// Signal that no more jobs will be submitted
 	close(w.JobQueue)
-	// Ensure any waiting workers are released
-	w.cancel()
+
 	// Wait for all workers to finish processing remaining jobs
+	// Ensure any waiting workers are released
 	w.wg.Wait()
+
 	// Close results after all workers have exited
 	close(w.ResultQueue)
 	w.logger.Info().Msg("workerpool stopped")
 }
 
 // Submit enqueues a job for execution. It returns false if the pool is stopping.
-func (w *Workerpool) Submit(j Job) bool {
+func (w *Workerpool) Submit(j Job) error {
 	select {
 	case w.JobQueue <- j:
-		return true
+		return nil
 	case <-w.ctx.Done():
-		return false
+		return w.ctx.Err()
+	default:
+		return errors.New("workerpool queue is full")
 	}
 }
