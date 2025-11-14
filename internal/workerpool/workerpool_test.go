@@ -2,7 +2,6 @@ package workerpool
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"sync"
 	"testing"
@@ -17,41 +16,40 @@ func TestNewWorkerPool(t *testing.T) {
 	logger := zerolog.New(os.Stdout).Level(zerolog.DebugLevel)
 
 	t.Run("Creation Sucessed", func(t *testing.T) {
-		wp, err := New(context.Background(), 1, 1, &logger)
+		wp, err := NewPool(context.Background(), 1, 1, &logger)
 		assert.NoError(t, err)
 		assert.NotNil(t, wp, "workerpool can not be nil")
 	})
 	t.Run("Failed to create, empty log", func(t *testing.T) {
-		wp, err := New(context.Background(), 1, 0, nil)
+		wp, err := NewPool(context.Background(), 1, 0, nil)
 		assert.Nil(t, wp)
 		assert.Error(t, err)
 	})
 	t.Run("Bad max workers", func(t *testing.T) {
-		wp, _ := New(context.Background(), 1, 0, &logger)
+		wp, _ := NewPool(context.Background(), 1, 0, &logger)
 		assert.Equal(t, 1, wp.maxWorkers, "when maxworkers is set less than 1, it need to be set as 1")
 	})
 	t.Run("Bad queueSize", func(t *testing.T) {
-		wp, _ := New(context.Background(), -1, 1, &logger)
+		wp, _ := NewPool(context.Background(), -1, 1, &logger)
 		assert.Equal(t, 1, wp.maxWorkers, "when queueSize is set less than 0, it need to be set as 1")
 	})
 	t.Run("Start workerpool", func(t *testing.T) {
-		wp, _ := New(context.Background(), 1, 1, &logger)
+		wp, _ := NewPool(context.Background(), 1, 1, &logger)
 		wp.Start()
 		defer wp.Stop()
 	})
 	// TODO: catch results
 	t.Run("Submit: sucessed", func(t *testing.T) {
-		wp, _ := New(context.Background(), 1, 1, &logger)
+		wp, _ := NewPool(context.Background(), 1, 1, &logger)
 		wp.Start()
 		defer wp.Stop()
 
 		job := func() error { return nil }
 		wp.Submit(job)
 	})
-	t.Run("Submit: failed", func(t *testing.T) {
-		wp, _ := New(context.Background(), 1, 1, &logger)
+	t.Run("Submit failed: closed channel", func(t *testing.T) {
+		wp, _ := NewPool(context.Background(), 1, 1, &logger)
 		wp.Start()
-		defer wp.Stop()
 
 		job := func() error {
 			time.Sleep(1 * time.Second)
@@ -66,9 +64,9 @@ func TestNewWorkerPool(t *testing.T) {
 			print(err)
 		}()
 
-		r2 := wp.Submit(job)
-		fmt.Println(r2) // Should be false if queue is full
-
+		wp.Stop()
+		err := wp.Submit(job)
+		assert.Error(t, err, "workerpool queue must be closed")
 		wg.Wait() // Wait for goroutine before Stop() is called
 	})
 }
