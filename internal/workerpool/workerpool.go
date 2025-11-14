@@ -14,8 +14,7 @@ type (
 )
 
 type FailedResult struct {
-	WorkerID int
-	Error    error
+	Error error
 }
 
 type Workerpool struct {
@@ -60,13 +59,14 @@ func NewPool(ctx context.Context, queueSize int, maxWorkers int, parentLogger *z
 		JobQueue:    make(chan Job, queueSize),
 		ResultQueue: make(chan FailedResult, queueSize),
 		maxWorkers:  maxWorkers,
-		isClosed:    false,
+		isClosed:    true,
 	}, nil
 }
 
 // Start spawns workers into the pools.
 func (w *Workerpool) Start() {
 	w.logger.Info().Msg(fmt.Sprintf("starting %d workers.", w.maxWorkers))
+	w.isClosed = false
 	// spawn workers
 	for i := range w.maxWorkers {
 		w.wg.Add(1)
@@ -93,8 +93,7 @@ func (w *Workerpool) worker(id int) {
 			err := job()
 			if err != nil {
 				res := FailedResult{
-					WorkerID: id,
-					Error:    fmt.Errorf("worker: %w", err),
+					Error: fmt.Errorf("worker: %w", err),
 				}
 				w.ResultQueue <- res
 			}

@@ -2,6 +2,7 @@ package workerpool
 
 import (
 	"context"
+	"errors"
 	"os"
 	"sync"
 	"testing"
@@ -15,7 +16,7 @@ func TestNewWorkerPool(t *testing.T) {
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnixMs
 	logger := zerolog.New(os.Stdout).Level(zerolog.DebugLevel)
 
-	t.Run("Creation Sucessed", func(t *testing.T) {
+	t.Run("Creation sucessed", func(t *testing.T) {
 		wp, err := NewPool(context.Background(), 1, 1, &logger)
 		assert.NoError(t, err)
 		assert.NotNil(t, wp, "workerpool can not be nil")
@@ -38,15 +39,17 @@ func TestNewWorkerPool(t *testing.T) {
 		wp.Start()
 		defer wp.Stop()
 	})
-	// TODO: catch results
+
 	t.Run("Submit: sucessed", func(t *testing.T) {
 		wp, _ := NewPool(context.Background(), 1, 1, &logger)
 		wp.Start()
 		defer wp.Stop()
 
 		job := func() error { return nil }
-		wp.Submit(job)
+		err := wp.Submit(job)
+		assert.NoError(t, err, "should not error")
 	})
+
 	t.Run("Submit failed: closed channel", func(t *testing.T) {
 		wp, _ := NewPool(context.Background(), 1, 1, &logger)
 		wp.Start()
@@ -60,8 +63,7 @@ func TestNewWorkerPool(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			err := wp.Submit(job)
-			print(err)
+			wp.Submit(job)
 		}()
 
 		wp.Stop()
@@ -69,6 +71,32 @@ func TestNewWorkerPool(t *testing.T) {
 		assert.Error(t, err, "workerpool queue must be closed")
 		wg.Wait() // Wait for goroutine before Stop() is called
 	})
-}
 
-// TODO: Test, submit before start ?
+	t.Run("Submit failed: workerpool not started", func(t *testing.T) {
+		wp, _ := NewPool(context.Background(), 1, 1, &logger)
+		defer wp.Stop()
+
+		job := func() error {
+			return nil
+		}
+
+		err := wp.Submit(job)
+		assert.Error(t, err, "workerpool queue must be closed")
+	})
+
+	t.Run("Get error from worker", func(t *testing.T) {
+		wp, _ := NewPool(context.Background(), 1, 1, &logger)
+		defer wp.Stop()
+
+		wp.Start()
+		job := func() error {
+			return errors.New("some error")
+		}
+
+		wp.Submit(job)
+		err := <-wp.ResultQueue
+
+		assert.Error(t, err.Error, "must return error")
+		assert.Contains(t, err.Error.Error(), "some error", "must return a error `some error`")
+	})
+}
