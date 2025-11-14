@@ -33,7 +33,7 @@ func NewTelemetryAgent(ctx context.Context, cfg *config.TelemetryAgentYAML, logg
 		return nil, err
 	}
 
-	wp, err := workerpool.New(ctx, cfg.QueueSize, cfg.MaxWorkers, logger)
+	wp, err := workerpool.NewPool(ctx, cfg.QueueSize, cfg.MaxWorkers, logger)
 	if err != nil {
 		return nil, err
 	}
