@@ -12,7 +12,7 @@ func (a *application) routes() *gin.Engine {
 	gin.DisableConsoleColor()
 
 	// Add the otelgin middleware
-	router.Use(otelgin.Middleware("iot-hydra-runtime"))
+	router.Use(otelgin.Middleware("iot-hydra-runtime-app"))
 	{
 		v1 := router.Group("/v1")
 		{

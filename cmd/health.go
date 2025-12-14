@@ -18,8 +18,8 @@ func (a *application) healthChecker(c *gin.Context) {
 	// Add queue health if telemetry agent is available
 	if a.TelemetryAgent != nil {
 		health["telemetry"] = map[string]interface{}{
-			"queue_length": len(a.TelemetryAgent.Queue),
-			"queue_capacity": cap(a.TelemetryAgent.Queue),
+			"queue_length":      len(a.TelemetryAgent.Queue),
+			"queue_capacity":    cap(a.TelemetryAgent.Queue),
 			"brokers_connected": len(a.TelemetryAgent.Brokers),
 		}
 	}
@@ -46,6 +46,5 @@ func (a *application) healthChecker(c *gin.Context) {
 		statusCode = http.StatusServiceUnavailable
 	}
 
-	a.logger.Debug().Interface("health", health).Msg("health check requested")
 	c.JSON(statusCode, health)
 }

@@ -3,6 +3,9 @@ FROM golang:1.25-alpine
 
 WORKDIR /app
 
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories \
+  || sed -i 's/dl-cdn.alpinelinux.org/dl-4.alpinelinux.org/g' /etc/apk/repositories
+
 # Install only necessary dependencies
 RUN apk add --no-cache git curl bash gpgme-dev libassuan-dev libgpg-error-dev build-base btrfs-progs-dev
 

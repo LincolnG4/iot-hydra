@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"github.com/LincolnG4/iot-hydra/internal/config"
+	"github.com/LincolnG4/iot-hydra/internal/observability"
 	"github.com/LincolnG4/iot-hydra/internal/runtimer"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -41,12 +42,13 @@ func main() {
 	}
 
 	// OpenTelemetry setup
-	log.Debug().Msg("starting OpenTelemetry")
-	otelShutdown, err := setupOTelSDK(ctx)
+	log.Debug().Msg("starting opentelemetry")
+	otelShutdown, err := observability.SetupOTelSDK(ctx)
 	if err != nil {
 		log.Error().Err(err).Msg("")
 		return
 	}
+
 	// Handle shutdown properly so nothing leaks.
 	defer func() {
 		err = errors.Join(err, otelShutdown(context.Background()))

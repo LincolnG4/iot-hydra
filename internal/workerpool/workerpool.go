@@ -7,6 +7,8 @@ import (
 	"sync"
 
 	"github.com/rs/zerolog"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
 )
 
 type (
@@ -77,9 +79,15 @@ func (w *Workerpool) Start() {
 func (w *Workerpool) worker(id int) {
 	w.logger.Debug().Str("component", "worker").Int("worker ID", id).Msg("worker started")
 	defer w.wg.Done()
+
+	// Count number of workers and add id to metadata
+	workerCnt.Add(w.ctx, 1, metric.WithAttributes(attribute.Int("id", id)))
+
 	for {
 		select {
 		case <-w.ctx.Done():
+			// Update metric stopping  worker
+			workerCnt.Add(w.ctx, -1, metric.WithAttributes(attribute.Int("id", id)))
 			w.logger.Info().Msg("workerpool context done. worker stopped")
 			return
 
@@ -90,15 +98,18 @@ func (w *Workerpool) worker(id int) {
 			}
 			w.logger.Debug().Msg("starting job...")
 
+			// Run job
 			err := job()
+
+			// Decrease queue metric
+			jobQueueCnt.Add(w.ctx, -1)
+
 			if err != nil {
 				res := FailedResult{
 					Error: fmt.Errorf("worker: %w", err),
 				}
 				w.ResultQueue <- res
 			}
-
-			w.logger.Debug().Msg("finish")
 		}
 	}
 }
@@ -140,6 +151,9 @@ func (w *Workerpool) Submit(j Job) error {
 	case <-w.ctx.Done():
 		return w.ctx.Err()
 	case w.JobQueue <- j:
+		w.logger.Debug().Msg("job added to the queue")
+		// Increase queue metric
+		jobQueueCnt.Add(w.ctx, 1)
 		return nil
 	default:
 		return errors.New("workerpool queue is full")

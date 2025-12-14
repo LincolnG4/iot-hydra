@@ -10,51 +10,15 @@ services:
       - ./nats.conf:/etc/nats/nats.conf
     networks:
       - iot-net
-  alloy:
-    container_name: alloy
-    image: grafana/alloy:latest
-    pull_policy: always
-    restart: on-failure
-    volumes:
-      - type: bind
-        source: ./config/alloy/config.alloy
-        target: /etc/alloy/config.alloy
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - type: bind
-        source: /var/log
-        target: /var/log
-      - type: bind
-        source: /proc
-        target: /host/proc
-        read_only: true
-      - type: bind
-        source: /
-        target: /host/rootfs
-        read_only: true
-      - type: bind
-        source: /sys
-        target: /host/sys
-        read_only: true
-    environment:
-      LOKI_HOST: loki:3100
-    depends_on:
-      - loki
-      - tempo
-    command:
-      - run
-      - /etc/alloy/config.alloy
-      - --server.http.listen-addr=0.0.0.0:12345
-    ports:
-      - "12345:12345"
-    networks:
-      - iot-net
+
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
     ports:
       - "9090:9090"
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+      - ./config/prometheus/config.yml:/etc/prometheus/prometheus.yml
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
@@ -62,8 +26,18 @@ services:
       - "--web.console.templates=/etc/prometheus/consoles"
       - "--storage.tsdb.retention.time=200h"
       - "--web.enable-lifecycle"
+    restart: unless-stopped
     networks:
       - iot-net
+
+  otel-collector:
+    image: otel/opentelemetry-collector
+    container_name: otel-collector
+    volumes:
+      - ./config/otel/config.yml:/etc/otelcol/config.yaml
+    networks:
+      - iot-net
+
   grafana:
     image: grafana/grafana:latest
     container_name: grafana
@@ -81,8 +55,6 @@ services:
     container_name: loki
     image: grafana/loki:latest
     restart: on-failure
-    ports:
-      - "3100:3100"
     networks:
       - iot-net
 
@@ -93,11 +65,9 @@ services:
     command: ["-config.file=/etc/tempo.yaml"]
     volumes:
       - ./config/tempo/tempo.yaml:/etc/tempo.yaml
-    ports:
-      - "3200:3200"
-      - "4317:4317"
     networks:
       - iot-net
+
   iot-runtime:
     container_name: iot-runtime
     env_file: ".envrc"
@@ -108,16 +78,15 @@ services:
     networks:
       - iot-net
     ports:
-      - "8080:8080"
+      - 8080:8080
     volumes:
       - .:/app
       - /run/user/1000/podman/podman.sock:/run/user/1000/podman/podman.sock:ro
-    environment:
-      - PODMAN_SOCKET_PATH=unix:///run/user/1000/podman/podman.sock
-      - YAML_CONFIG_PATH="./config.yaml"
+
 volumes:
   grafana-storage:
   tempo-storage:
+  prometheus_data:
 
 networks:
   iot-net:
