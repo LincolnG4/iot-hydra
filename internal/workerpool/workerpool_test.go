@@ -26,7 +26,7 @@ func TestNewWorkerPool(t *testing.T) {
 		assert.Nil(t, wp)
 		assert.Error(t, err)
 	})
-	t.Run("Bad max workers", func(t *testing.T) {
+	t.Run("If number of workers less than 0 returns 1", func(t *testing.T) {
 		wp, _ := NewPool(context.Background(), 1, 0, &logger)
 		assert.Equal(t, 1, wp.maxWorkers, "when maxworkers is set less than 1, it need to be set as 1")
 	})
